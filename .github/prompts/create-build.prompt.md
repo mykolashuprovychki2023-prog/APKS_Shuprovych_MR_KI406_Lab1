@@ -22,12 +22,14 @@ argument-hint: "projectName=hello-ts"
 ## Дії
 
 1. Прочитай [SKILL.md](../skills/build-and-test/SKILL.md).
-2. Застосуй шаблони: `node tools/apply-templates.mjs build-and-test --var PROJECT_NAME=<назва>`.
-3. Встанови залежності: `npm ci --no-audit --no-fund`.
-4. Склади проєкт: `npm run build`.
-5. Запусти тести: `npm test`.
-6. Створи виконуваний файл: `npm run package`, потім запусти `build/hello` (Windows: `build\hello.exe`).
-7. Після кожного кроку наведи фактичний вивід; на першій помилці зупинись.
+2. Попередній перегляд: `node tools/apply-templates.mjs build-and-test --var PROJECT_NAME=<назва> --dry-run`.
+3. Застосуй шаблони: та сама команда без `--dry-run`. Якщо є `CONFLICT` — зупинись.
+4. Встанови залежності: `npm ci --no-audit --no-fund` (попередження `npm warn install-scripts ... esbuild` очікуване).
+5. Склади проєкт: `npm run build`.
+6. Запусти тести: `npm test`.
+7. Створи виконуваний файл: `npm run package`, потім запусти `build/hello` (Windows: `build\hello.exe`).
+8. Перевір повний цикл, як у CI: `bash ci.sh` (Linux, macOS, Git Bash) або `.\ci.bat` (Windows).
+9. Після кожного кроку наведи фактичний вивід; на першій помилці зупинись.
 
 ## Очікувані файли
 
@@ -37,13 +39,18 @@ argument-hint: "projectName=hello-ts"
 - `README.md` з блоком `<!-- build-and-test:begin -->`
 - Артефакти лише в `build/`: `hello.cjs`, `hello` / `hello.exe`, `test-results/junit.xml`
 
+`ci.sh` має бути виконуваним у Git. На Windows (`core.filemode=false`) біт виконання не записується
+автоматично, тому під час коміту користувач додає файл командою `git add --chmod=+x ci.sh`.
+
 ## Перевірка
 
 | Перевірка | Команда | Очікування |
 |---|---|---|
+| Залежності | `npm ci --no-audit --no-fund` | код 0, `package-lock.json` не змінено |
 | Складання | `npm run build` | код 0, є `build/hello.cjs` |
 | Тести | `npm test` | `Tests 2 passed`, `BasicAddition` у JUnit |
-| Виконуваний файл | `build/hello` | вивід містить `Hello, World!` |
+| Виконуваний файл | `build/hello` (Windows: `build\hello.exe`) | вивід містить `Hello, World!` |
+| Повний цикл | `bash ci.sh` або `.\ci.bat` | останній рядок `==== CI OK ====`, код 0 |
 | Git | `git status --short` | немає `build/` і `node_modules/` |
 
 ## Повідомлення про помилку

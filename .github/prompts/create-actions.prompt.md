@@ -17,9 +17,11 @@ agent: build-engineer
 
 1. Прочитай [SKILL.md](../skills/github-actions/SKILL.md).
 2. Визнач `REPO_SLUG`: `git remote get-url origin` → `owner/repo`; якщо remote немає — значення за замовчуванням зі skill.
-3. Застосуй шаблони: `node tools/apply-templates.mjs github-actions --var REPO_SLUG=<owner/repo>`.
+3. Попередній перегляд: `node tools/apply-templates.mjs github-actions --var REPO_SLUG=<owner/repo> --dry-run`,
+   потім та сама команда без `--dry-run`. Якщо є `CONFLICT` — зупинись.
 4. Перевір workflow: `node tools/check.mjs --only workflow`.
-5. Нагадай користувачу: workflow запуститься після його `git push` / pull request до `develop` або `master`.
+5. Нагадай користувачу: workflow запуститься після його push у `develop`/`master` або pull request до них
+   (push лише у `feature/...` workflow не запускає).
 
 ## Очікувані файли
 
@@ -31,7 +33,10 @@ agent: build-engineer
 | Перевірка | Команда | Очікування |
 |---|---|---|
 | Workflow | `node tools/check.mjs --only workflow` | W1–W5 `[ OK ]`, код 0 |
-| Після push | `gh run list --workflow ci.yml --limit 3` | job для трьох ОС, `success` |
+| Запуск у GitHub (поза `init`, після push або PR користувача) | `gh run list --workflow ci.yml --limit 3` | job для трьох ОС, `success` |
+
+Агент не виконує `git push` (заборона маніфесту), тому в межах `init` рядок «Запуск у GitHub» позначається
+як «очікує push користувача», а не як помилка.
 
 ## Повідомлення про помилку
 

@@ -5,9 +5,10 @@
 //   node tools/check.mjs [--agent-only] [--skip-build] [--only <group>]...
 //   groups: agent, project, git, build, workflow
 //
-// The check does not modify project files. It only writes build/check-report.md
-// (build/ is ignored by Git) and runs `npm ci` into node_modules/ when the
-// dependencies are missing. Exit code: 0 - all checks passed, 1 - a check failed.
+// The check does not modify project files. It writes only into build/ (check-report.md
+// and the build artifacts of B1-B3) and runs `npm ci` into node_modules/ when the
+// dependencies are missing; both directories are ignored by Git.
+// Exit code: 0 - all checks passed, 1 - a check failed.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -223,7 +224,10 @@ function checkGit() {
   record('G3', 'У Git немає build-каталогів і залежностей', tracked.code === 0 && tracked.out.trim() === '',
     tracked.out.trim() ? `відстежуються: ${tail(tracked.out, 5)}` : '');
 
-  const files = sh('git ls-files').out.split('\n').map((s) => s.trim()).filter(Boolean);
+  // tracked files plus new (untracked, not ignored) files: a first `init` creates
+  // the whole project as untracked files, and they must be scanned before the commit
+  const files = sh('git ls-files --cached --others --exclude-standard').out
+    .split('\n').map((s) => s.trim()).filter(Boolean);
   const leaks = [];
   for (const file of files) {
     if (/(^|\/)\.env(\.|$)/.test(file)) leaks.push(`${file} (.env)`);
@@ -232,7 +236,7 @@ function checkGit() {
     const text = readFileSync(path, 'utf8');
     if (SECRET_PATTERNS.some((re) => re.test(text))) leaks.push(file);
   }
-  record('G4', 'Секретів (токени, ключі, .env) у відстежуваних файлах немає', !leaks.length, leaks.join(', '));
+  record('G4', 'Секретів (токени, ключі, .env) у файлах репозиторію немає', !leaks.length, leaks.join(', '));
 }
 
 // ---- B. build and tests -----------------------------------------------------------

@@ -67,6 +67,8 @@ argument-hint: "PROJECT_NAME=hello-ts"
 | `Tests 1 failed` | регресія у `add` або `greet` | показати тест, що впав; заборонено `.skip` чи зміну очікуваного значення без пояснення |
 | `[package] build/hello.cjs not found` | `package` запущено до `build` | виконати `npm run build`, повторити |
 | `CONFLICT package.json` | файл змінено вручну | не перезаписувати; показати різницю; запитати користувача |
+| `npm warn install-scripts ... esbuild@0.28.2 (postinstall)` | npm 11 не виконує install-скрипти без дозволу | очікуване попередження: esbuild працює через optional dependency, дій не потрібно |
+| `./ci.sh: Permission denied` (Linux, macOS) | у Git немає біта виконання `ci.sh` | запускати `bash ./ci.sh`; під час коміту на Windows — `git add --chmod=+x ci.sh` |
 
 ## Приклад
 

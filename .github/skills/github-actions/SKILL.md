@@ -55,7 +55,7 @@ argument-hint: "REPO_SLUG=owner/repo"
 | Matrix з трьох ОС, одна job | те саме (W3) | `[ OK ] W3` |
 | Лише виклики `ci.sh`/`ci.bat` | те саме (W4) | `[ OK ] W4` |
 | Artifacts і відсутність секретів | те саме (W5) | `[ OK ] W5` |
-| Запуск у GitHub | `gh run list --workflow ci.yml` | три job зі статусом `success` |
+| Запуск у GitHub (після push або PR користувача, поза `init`) | `gh run list --workflow ci.yml` | три job зі статусом `success` |
 
 ## Обробка помилок
 

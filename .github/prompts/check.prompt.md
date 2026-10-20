@@ -7,7 +7,8 @@ agent: build-engineer
 # Команда check
 
 Підтверджує, що результат відповідає вимогам. Команда **не змінює файли проєкту**: вона пише лише
-у `build/check-report.md` і, якщо залежностей немає, виконує `npm ci` у `node_modules/`.
+в ігнорований каталог `build/` (звіт `check-report.md` і артефакти перевірок B1–B3) і, якщо залежностей
+немає, виконує `npm ci` у `node_modules/`.
 
 ## Передумови
 
@@ -36,18 +37,21 @@ agent: build-engineer
 | agent | A4 | `init` викликає команди в порядку git-init → create-project → create-build → create-actions → check |
 | agent | A5–A6 | README, архітектура, інструкція, журнал AI, інструменти агента |
 | project | P1–P4 | структура проєкту, npm scripts, тест `BasicAddition`, розділи README |
-| git | G1–G4 | репозиторій, ігнорування `build/` і `node_modules/`, відсутність секретів |
-| build | B0–B4 | `npm ci`, складання, тести, виконуваний файл, його запуск |
+| git | G1–G4 | репозиторій, ігнорування `build/` і `node_modules/`, відсутність секретів у відстежуваних і нових файлах |
+| build | B0–B4 | `npm ci` (B0 — лише якщо немає `node_modules/`), складання, тести, виконуваний файл, його запуск |
 | workflow | W1–W5 | YAML, тригери, matrix трьох ОС, лише `ci.sh`/`ci.bat`, artifacts без секретів |
 
 ## Очікувані файли
 
-- `build/check-report.md` — Markdown-звіт (каталог `build/` ігнорується Git).
+- `build/check-report.md` — Markdown-звіт останнього запуску (запуск з `--only` перезаписує його звітом лише
+  для вибраної групи).
+- Артефакти перевірок B1–B3 у `build/`: `hello.cjs`, `hello` / `hello.exe`, `sea-prep.blob`, `test-results/junit.xml`.
 - Інших змін немає: `git status --short` до і після `check` однаковий.
 
 ## Перевірка
 
-- Код виходу `node tools/check.mjs` — `0`, останній рядок `check: OK - N/N перевірок пройдено`.
+- Код виходу `node tools/check.mjs` — `0`, останній рядок `check: OK - N/N перевірок пройдено`
+  (зазвичай 30 перевірок; 31 — якщо додатково виконувався B0 `npm ci`).
 
 ## Повідомлення про помилку
 
