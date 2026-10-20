@@ -259,8 +259,14 @@ function checkBuild() {
   const basic = /<testcase[^>]*name="[^"]*BasicAddition"/.test(junit);
   const failures = junit.match(/<testsuites[^>]*failures="(\d+)"/);
   const okTests = test.code === 0 && basic && failures && failures[1] === '0';
+  // show the failing test and the assertion message instead of the whole Vitest output
+  const reason = test.out.split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^(FAIL\s|AssertionError|TypeError|ReferenceError|Error:)/.test(line))
+    .slice(0, 4)
+    .join('\n');
   record('B2', 'Тести: npm test (Vitest), BasicAddition пройдено', okTests,
-    okTests ? '' : tail(test.out) || 'JUnit-звіт без BasicAddition');
+    okTests ? '' : reason || tail(test.out) || 'JUnit-звіт без BasicAddition');
 
   const pack = sh('npm run package');
   const exe = process.platform === 'win32' ? 'build/hello.exe' : 'build/hello';
