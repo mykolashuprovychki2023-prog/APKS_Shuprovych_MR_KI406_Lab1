@@ -35,7 +35,8 @@ argument-hint: "REPO_SLUG=owner/repo"
 
 - тригери: `push` і `pull_request` до `develop` та `master`, а також ручний `workflow_dispatch`;
 - одна job `build-and-test` з `strategy.matrix.os: [ubuntu-latest, windows-latest, macos-latest]`, `fail-fast: false`;
-- кроки: `actions/checkout@v7` → `actions/setup-node@v7` (Node.js 24) → `bash ./ci.sh` або `.\ci.bat` → `actions/upload-artifact@v7`;
+- кроки: `actions/checkout@v7` → `actions/setup-node@v7` (точна версія Node.js 24.20.0, та сама, що локально) → `bash ./ci.sh` або `.\ci.bat` → `actions/upload-artifact@v7` (artifacts зберігаються 90 днів);
+- кроки зі скриптами мають фіксовані умови `if: runner.os != 'Windows'` / `if: runner.os == 'Windows'`, `continue-on-error` заборонено;
 - мінімальні права `permissions: contents: read`, жодних секретів.
 
 ## Порядок дій
@@ -53,7 +54,7 @@ argument-hint: "REPO_SLUG=owner/repo"
 | YAML коректний | `node tools/check.mjs --only workflow` (W1) | `[ OK ] W1` |
 | Тригери develop/master | те саме (W2) | `[ OK ] W2` |
 | Matrix з трьох ОС, одна job | те саме (W3) | `[ OK ] W3` |
-| Лише виклики `ci.sh`/`ci.bat` | те саме (W4) | `[ OK ] W4` |
+| Лише виклики `ci.sh`/`ci.bat`, без `continue-on-error` і змінених `if` | те саме (W4) | `[ OK ] W4` |
 | Artifacts і відсутність секретів | те саме (W5) | `[ OK ] W5` |
 | Запуск у GitHub (після push або PR користувача, поза `init`) | `gh run list --workflow ci.yml` | три job зі статусом `success` |
 

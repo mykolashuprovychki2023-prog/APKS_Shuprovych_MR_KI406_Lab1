@@ -56,7 +56,7 @@ node tools/check.mjs
 | Повний цикл CI | `bash ci.sh` | `.\ci.bat` |
 | Складання | `npm run build` | `npm run build` |
 | Тести | `npm test` | `npm test` |
-| Виконуваний файл | `npm run package && ./build/hello` | `npm run package && build\hello.exe` |
+| Виконуваний файл | `npm run package && ./build/hello` | `npm run package`, потім `build\hello.exe` (у Windows PowerShell 5.1 оператора `&&` немає) |
 | Git не бачить build/ | `git status --short` | `git status --short` |
 
 Очікуваний вивід застосунку:
@@ -67,6 +67,9 @@ Platform: <os>/<arch>, Node.js v24.x.x
 ```
 
 ## 4. Демонстрація реакції на навмисно зламану перевірку
+
+Демонстрацію виконують на гілці `feature/lab1-hello-ts`, де файли вже закомічені (на незакоміченому запуску
+`git restore` їх не знає — тоді поверніть зміну вручну або повторіть відповідну команду агента).
 
 1. Зламати тест: у `tests/basic.test.ts` замінити `toBe(5)` на `toBe(6)`.
 2. Запустити `node tools/check.mjs`. Очікування: `[FAIL] B2 Тести ...` з текстом
@@ -79,7 +82,14 @@ Platform: <os>/<arch>, Node.js v24.x.x
 
 - Повторний `/be-init` у вже створеному проєкті дає лише статуси `UNCHANGED`, а `git status --short`
   не показує нових змін.
-- Порівняти свій запуск з еталонною гілкою: `git diff feature/lab1-hello-ts -- . ":(exclude)docs"`.
+- Порівняти свій запуск з еталонною гілкою. Після `/be-init` згенеровані файли ще не відстежуються Git, тому
+  спочатку додайте їх в індекс, інакше `git diff` покаже їх як «видалені»:
+  ```bash
+  git add -A
+  git diff --cached feature/lab1-hello-ts --stat -- . ":(exclude)docs"
+  ```
+  Очікування: порожній вивід. На Windows може з'явитися лише `ci.sh | 0` (режим 100644 замість 100755) —
+  його усуває `git add --chmod=+x ci.sh`.
 
 ## 6. CI у GitHub
 

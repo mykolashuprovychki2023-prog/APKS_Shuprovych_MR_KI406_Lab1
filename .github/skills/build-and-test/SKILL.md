@@ -31,10 +31,11 @@ argument-hint: "PROJECT_NAME=hello-ts"
 |---|---|---|
 | 3.1 Система складання | `package.json`, `package-lock.json`, `tsconfig.json`, `sea-config.json`, `scripts/build-sea.mjs` | npm scripts `build`, `test`, `package`, `start`; фіксовані версії TypeScript 7, esbuild, Vitest 5, postject, yaml |
 | 3.2 Тестова функція і тест | `src/math.ts`, `tests/basic.test.ts`, `vitest.config.ts` | `add(a, b)`; тести `HelloTest > BasicAddition`, `HelloTest > HelloMessage`; JUnit у `build/test-results/junit.xml` |
-| 3.3 Скрипти CI | `ci.sh`, `ci.bat`, `scripts/ci-summary.mjs` | повний цикл: `npm ci` → build → test → package → smoke test → підсумок |
+| 3.3 Скрипти CI | `ci.sh`, `ci.bat`, `scripts/ci-summary.mjs` | повний цикл: `npm ci` → build → test → package → smoke test → підсумок (тести, пропущені тести, розмір `hello`) |
 | 3.4 Документація | `README.md` (блок `build-and-test`) | таблиця команд складання |
 
 Згенеровані артефакти (`build/hello.cjs`, `build/hello`, `build/hello.exe`, звіти) з'являються лише в `build/`.
+Пакет `yaml` у devDependencies потрібен не застосунку, а команді `check` агента: нею вона розбирає `ci.yml` (перевірки W1–W5).
 
 ## Порядок дій
 

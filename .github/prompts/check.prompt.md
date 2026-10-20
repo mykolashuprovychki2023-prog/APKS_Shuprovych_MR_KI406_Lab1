@@ -36,10 +36,10 @@ agent: build-engineer
 | agent | A3.x | кожна command: передумови, дії, очікувані файли, перевірка, повідомлення про помилку |
 | agent | A4 | `init` викликає команди в порядку git-init → create-project → create-build → create-actions → check |
 | agent | A5–A6 | README, архітектура, інструкція, журнал AI, інструменти агента |
-| project | P1–P4 | структура проєкту, npm scripts, тест `BasicAddition`, розділи README |
+| project | P1–P5 | структура проєкту, npm scripts, тест `BasicAddition` без `.skip`/`.skipIf`/`.only`/`.todo`/`.fails`, розділи README, збіг файлів із шаблонами skills (`apply-templates --dry-run`: жодного `CREATED`/`MERGED`/`CONFLICT`) |
 | git | G1–G4 | репозиторій, ігнорування `build/` і `node_modules/`, відсутність секретів у відстежуваних і нових файлах |
-| build | B0–B4 | `npm ci` (B0 — лише якщо немає `node_modules/`), складання, тести, виконуваний файл, його запуск |
-| workflow | W1–W5 | YAML, тригери, matrix трьох ОС, лише `ci.sh`/`ci.bat`, artifacts без секретів |
+| build | B0–B4 | `npm ci` (B0 — лише якщо немає `node_modules/`), складання, тести (`BasicAddition` справді виконано, пропущених тестів немає), виконуваний файл, його запуск |
+| workflow | W1–W5 | YAML, тригери, matrix трьох ОС, лише `ci.sh`/`ci.bat` з фіксованими `if` і без `continue-on-error`, artifacts без секретів |
 
 ## Очікувані файли
 
@@ -51,7 +51,7 @@ agent: build-engineer
 ## Перевірка
 
 - Код виходу `node tools/check.mjs` — `0`, останній рядок `check: OK - N/N перевірок пройдено`
-  (зазвичай 30 перевірок; 31 — якщо додатково виконувався B0 `npm ci`).
+  (зазвичай 31 перевірка; 32 — якщо додатково виконувався B0 `npm ci`).
 
 ## Повідомлення про помилку
 

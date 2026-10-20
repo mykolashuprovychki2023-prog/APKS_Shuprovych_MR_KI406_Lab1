@@ -1,6 +1,7 @@
-# CI for the hello-ts project (APKS lab 1, variant 6).
+# CI for the hello project (APKS lab 1, variant 6).
 # All build logic lives in ci.sh / ci.bat: the workflow only checks out the code,
-# prepares Node.js, calls the script and keeps the results (executables + JUnit report).
+# prepares a pinned Node.js version, calls the script and keeps the results
+# (executables + JUnit report).
 name: CI
 
 on:
@@ -25,10 +26,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up Node.js 24
+      - name: Set up Node.js 24.20.0
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 24.20.0
 
       - name: Build and test (ci.sh)
         if: runner.os != 'Windows'
@@ -50,4 +51,4 @@ jobs:
             build/hello.exe
             build/test-results/junit.xml
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 90

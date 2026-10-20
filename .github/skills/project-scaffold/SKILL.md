@@ -23,7 +23,7 @@ argument-hint: "LANGUAGE=TypeScript PROJECT_NAME=hello-ts"
 | Параметр | Обов'язковий | За замовчуванням | Обмеження |
 |---|---|---|---|
 | `LANGUAGE` | так | `TypeScript` | лише `TypeScript` (варіант 6) |
-| `PROJECT_NAME` | так | `hello-ts` | правила npm: `^[a-z0-9][a-z0-9._-]*$` |
+| `PROJECT_NAME` | так | `hello-ts` | правила npm: `^[a-z0-9][a-z0-9._-]{0,213}$` |
 
 Передумови: поточний каталог — корінь репозиторію (є `.github/skills`), Node.js ≥ 22.18 (`node --version`).
 

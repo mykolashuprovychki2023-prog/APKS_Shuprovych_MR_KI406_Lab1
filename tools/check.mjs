@@ -8,7 +8,7 @@
 // The check does not modify project files. It writes only into build/ (check-report.md
 // and the build artifacts of B1-B3) and runs `npm ci` into node_modules/ when the
 // dependencies are missing; both directories are ignored by Git.
-// Exit code: 0 - all checks passed, 1 - a check failed.
+// Exit code: 0 - all checks passed, 1 - a check failed, 2 - invalid command-line arguments.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -196,13 +196,35 @@ function checkProject() {
   }
 
   const test = exists('tests/basic.test.ts') ? read('tests/basic.test.ts') : '';
-  record('P3', 'Юніт-тест BasicAddition існує', /BasicAddition/.test(test) && !/\.(skip|todo)\(/.test(test),
-    test ? 'тест відсутній або вимкнений (.skip/.todo)' : 'немає tests/basic.test.ts');
+  // any way to disable or narrow the tests: .skip/.skipIf/.runIf/.todo/.fails/.only, xit/xdescribe
+  const disabled = test.match(/\b(?:it|test|describe)\s*\.\s*(?:skip|skipIf|runIf|todo|fails|only)\b|\bx(?:it|describe)\s*\(/);
+  record('P3', 'Юніт-тест BasicAddition існує і не вимкнений', /BasicAddition/.test(test) && !disabled,
+    test ? `тест відсутній або вимкнений${disabled ? ` (${disabled[0]})` : ''}` : 'немає tests/basic.test.ts');
 
   const readme = exists('README.md') ? read('README.md') : '';
   const blocks = ['project-scaffold', 'build-and-test', 'github-actions'].filter((b) => !readme.includes(`<!-- ${b}:begin -->`));
   record('P4', 'README містить розділи запуску проєкту, складання і CI', !blocks.length,
     blocks.length ? `немає блоків: ${blocks.join(', ')}` : '');
+
+  // P5: generated files must equal the skill templates (catches manual edits such as `|| true`
+  // in ci.sh or `continue-on-error` in ci.yml, and confirms that a re-run would change nothing)
+  if (exists('package.json')) {
+    const name = JSON.parse(read('package.json')).name;
+    const remote = sh('git remote get-url origin').out.trim().match(/github\.com[/:]([^/]+\/[^/.\s]+)/);
+    const runs = [
+      `project-scaffold --var LANGUAGE=TypeScript --var PROJECT_NAME=${name}`,
+      `build-and-test --var PROJECT_NAME=${name}`,
+      `github-actions${remote ? ` --var REPO_SLUG=${remote[1]}` : ''}`,
+    ];
+    const drift = [];
+    for (const args of runs) {
+      const out = sh(`node tools/apply-templates.mjs ${args} --dry-run`).out;
+      for (const m of out.matchAll(/^\s+(CREATED|MERGED|CONFLICT)\s+(\S+)/gm)) drift.push(`${m[1]} ${m[2]}`);
+      if (/ERROR/.test(out)) drift.push(out.trim().split('\n').pop());
+    }
+    record('P5', 'Файли проєкту збігаються з шаблонами skills (без ручних змін)', !drift.length,
+      drift.length ? `відрізняються від шаблонів: ${drift.join(', ')}` : '');
+  }
 }
 
 // ---- G. git hygiene -------------------------------------------------------------
@@ -256,17 +278,22 @@ function checkBuild() {
 
   const test = sh('npm test');
   const junit = exists('build/test-results/junit.xml') ? read('build/test-results/junit.xml') : '';
-  const basic = /<testcase[^>]*name="[^"]*BasicAddition"/.test(junit);
+  // BasicAddition must really run and pass: no <skipped/>, <failure> or <error> inside its testcase,
+  // and no skipped tests at all (a skipped test also makes Vitest exit with code 0)
+  const basicCase = junit.match(/<testcase[^>]*name="[^"]*BasicAddition"[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/);
+  const basic = Boolean(basicCase) && !/<(skipped|failure|error)\b/.test(basicCase[1] ?? '');
   const failures = junit.match(/<testsuites[^>]*failures="(\d+)"/);
-  const okTests = test.code === 0 && basic && failures && failures[1] === '0';
+  const skipped = (junit.match(/<skipped\b/g) ?? []).length;
+  const okTests = test.code === 0 && basic && failures && failures[1] === '0' && skipped === 0;
   // show the failing test and the assertion message instead of the whole Vitest output
   const reason = test.out.split('\n')
     .map((line) => line.trim())
     .filter((line) => /^(FAIL\s|AssertionError|TypeError|ReferenceError|Error:)/.test(line))
     .slice(0, 4)
     .join('\n');
-  record('B2', 'Тести: npm test (Vitest), BasicAddition пройдено', okTests,
-    okTests ? '' : reason || tail(test.out) || 'JUnit-звіт без BasicAddition');
+  record('B2', 'Тести: npm test (Vitest), BasicAddition виконано і пройдено', okTests,
+    okTests ? '' : reason || (skipped ? `пропущено тестів: ${skipped} (BasicAddition: ${basic ? 'OK' : 'не виконано'})`
+      : tail(test.out)) || 'JUnit-звіт без BasicAddition');
 
   const pack = sh('npm run package');
   const exe = process.platform === 'win32' ? 'build/hello.exe' : 'build/hello';
@@ -323,9 +350,23 @@ function checkWorkflow() {
   const allowed = /^(bash \.\/ci\.sh|\.\/ci\.sh|\.\\ci\.bat|ci\.bat)$/;
   const extra = runs.filter((r) => !allowed.test(r));
   const usesCheckout = steps.some((s) => String(s.uses ?? '').startsWith('actions/checkout@'));
-  const scriptsOk = usesCheckout && !extra.length && runs.some((r) => r.includes('ci.sh')) && runs.some((r) => r.includes('ci.bat'));
-  record('W4', 'Кроки: checkout і лише виклики ci.sh / ci.bat', scriptsOk,
-    scriptsOk ? '' : `checkout: ${usesCheckout}; зайві run: ${extra.join(' | ') || '-'}`);
+  // the scripts must really run on their OS: fixed `if` conditions, no continue-on-error anywhere
+  const expectedIf = (s) => {
+    const run = String(s.run ?? '');
+    if (run.includes('ci.sh')) return "runner.os != 'Windows'";
+    if (run.includes('ci.bat')) return "runner.os == 'Windows'";
+    if (String(s.uses ?? '').startsWith('actions/upload-artifact@')) return 'always()';
+    return undefined;
+  };
+  const badIf = steps.filter((s) => s.if !== undefined && String(s.if).trim() !== expectedIf(s))
+    .map((s) => `${s.name ?? s.uses ?? s.run}: if: ${s.if}`);
+  const missingIf = steps.filter((s) => s.run && s.if === undefined).map((s) => `${s.run}: немає if`);
+  const softFail = /continue-on-error/.test(read(file)) || job.if !== undefined;
+  const scriptsOk = usesCheckout && !extra.length && !badIf.length && !missingIf.length && !softFail
+    && runs.some((r) => r.includes('ci.sh')) && runs.some((r) => r.includes('ci.bat'));
+  record('W4', 'Кроки: checkout і лише виклики ci.sh / ci.bat без обходу помилок', scriptsOk,
+    scriptsOk ? '' : [`checkout: ${usesCheckout}`, `зайві run: ${extra.join(' | ') || '-'}`,
+      ...badIf, ...missingIf, softFail ? 'continue-on-error або if на рівні job' : ''].filter(Boolean).join('; '));
 
   const text = read(file);
   const artifacts = steps.some((s) => String(s.uses ?? '').startsWith('actions/upload-artifact@'));
