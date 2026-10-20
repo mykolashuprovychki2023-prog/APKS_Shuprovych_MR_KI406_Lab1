@@ -67,3 +67,20 @@ GitHub Actions на Windows, Linux і macOS. Гілка `develop` містить
 | `feature/lab1-hello-ts` | повний проєкт, створений агентом, з CI |
 
 Pull request `lab1/finish`: `feature/lab1-hello-ts` → `develop`.
+
+<!-- project-scaffold:begin -->
+## Проєкт `hello-ts`
+
+Мінімальний кросплатформний застосунок Hello World на TypeScript (варіант 6: TypeScript · npm scripts · Vitest).
+
+| Файл | Призначення |
+|---|---|
+| `src/main.ts` | точка входу застосунку `hello` |
+| `src/greeting.ts` | функція `greet()`, що формує привітання |
+
+Швидкий запуск без складання (Node.js ≥ 22.18 виконує TypeScript напряму):
+
+```bash
+node src/main.ts
+```
+<!-- project-scaffold:end -->
