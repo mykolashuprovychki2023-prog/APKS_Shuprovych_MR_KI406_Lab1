@@ -1,0 +1,13 @@
+{
+  "description": "GitHub Actions workflow with one job and an OS matrix (Windows, Linux, macOS) that only calls ci.sh / ci.bat",
+  "variables": {
+    "REPO_SLUG": {
+      "default": "mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1",
+      "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+    }
+  },
+  "files": [
+    { "from": "ci.yml.tpl", "to": ".github/workflows/ci.yml" },
+    { "from": "README.section.md.tpl", "to": "README.md", "mode": "block", "block": "github-actions" }
+  ]
+}

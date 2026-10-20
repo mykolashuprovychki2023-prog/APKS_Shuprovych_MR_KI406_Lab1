@@ -1,0 +1,20 @@
+{
+  "description": "Build system (npm scripts, tsc, esbuild, Node.js SEA), test function, Vitest unit test and CI scripts",
+  "variables": {
+    "PROJECT_NAME": { "default": "hello-ts", "pattern": "^[a-z0-9][a-z0-9._-]{0,213}$" }
+  },
+  "files": [
+    { "from": "package.json.tpl", "to": "package.json" },
+    { "from": "package-lock.json.tpl", "to": "package-lock.json" },
+    { "from": "tsconfig.json.tpl", "to": "tsconfig.json" },
+    { "from": "vitest.config.ts.tpl", "to": "vitest.config.ts" },
+    { "from": "sea-config.json.tpl", "to": "sea-config.json" },
+    { "from": "src/math.ts.tpl", "to": "src/math.ts" },
+    { "from": "tests/basic.test.ts.tpl", "to": "tests/basic.test.ts" },
+    { "from": "scripts/build-sea.mjs.tpl", "to": "scripts/build-sea.mjs" },
+    { "from": "scripts/ci-summary.mjs.tpl", "to": "scripts/ci-summary.mjs" },
+    { "from": "ci.sh.tpl", "to": "ci.sh", "executable": true },
+    { "from": "ci.bat.tpl", "to": "ci.bat" },
+    { "from": "README.section.md.tpl", "to": "README.md", "mode": "block", "block": "build-and-test" }
+  ]
+}

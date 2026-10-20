@@ -1,0 +1,14 @@
+{
+  "description": "Hello World skeleton in TypeScript (variant 6): sources, README section, .gitignore, .gitattributes",
+  "variables": {
+    "LANGUAGE": { "default": "TypeScript", "allowed": ["TypeScript"] },
+    "PROJECT_NAME": { "default": "hello-ts", "pattern": "^[a-z0-9][a-z0-9._-]{0,213}$" }
+  },
+  "files": [
+    { "from": "src/main.ts.tpl", "to": "src/main.ts" },
+    { "from": "src/greeting.ts.tpl", "to": "src/greeting.ts" },
+    { "from": "gitignore.tpl", "to": ".gitignore", "mode": "merge-lines" },
+    { "from": "gitattributes.tpl", "to": ".gitattributes", "mode": "merge-lines" },
+    { "from": "README.section.md.tpl", "to": "README.md", "mode": "block", "block": "project-scaffold" }
+  ]
+}
