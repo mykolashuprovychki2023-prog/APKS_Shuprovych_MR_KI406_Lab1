@@ -40,7 +40,7 @@ agent: build-engineer
 ## Повідомлення про помилку
 
 - `git-init: FAILED — Git не знайдено. Дія: встановіть Git і повторіть /be-git-init.`
-- `git-init: FAILED — .gitignore не ігнорує build/ (CONFLICT або ручні зміни). Дія: перегляньте .gitignore.`
+- `git-init: FAILED — .gitignore не ігнорує build/ або node_modules/ (рядок закоментовано чи додано правило-виняток «!build/»). Дія: виправте .gitignore і повторіть /be-git-init.`
 - `git-init: FAILED — команду запущено не з кореня репозиторію. Дія: відкрийте корінь і повторіть.`
 
 ## Повторний запуск
