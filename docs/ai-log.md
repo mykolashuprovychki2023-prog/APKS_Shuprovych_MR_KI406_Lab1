@@ -21,17 +21,40 @@
 | 4 | «Давай увійду в github» | Перезапустив вхід через device flow і передав новий одноразовий код | `Logged in as mykolashuprovychki2023-prog`, scopes `repo`, `workflow` |
 | 5 | Завдання AI: звірити формат агента з документацією VS Code | З'ясував: custom agents — `.github/agents/*.agent.md`, prompt files — `.github/prompts/*.prompt.md` (`name`, `agent`, `${input:...}`), Agent Skills — `.github/skills/<name>/SKILL.md`; набори інструментів `read`, `search`, `edit`, `execute`, `todos`; `/init` — вбудована команда | Формат файлів і префікс `be-` |
 | 6 | Завдання AI: еталонний проєкт TypeScript | Створив і перевірив локально: TypeScript 7.0.2, esbuild 0.28.2, Vitest 5.0.5, Node.js SEA, `ci.sh`, `ci.bat` | Складання, 2 тести, `hello.exe` — успішно |
-| 7 | Завдання AI: агент на гілці `develop` | Створив manifest, 3 skills із шаблонами, 6 commands, `tools/apply-templates.mjs`, `tools/check.mjs`, адаптери Claude Code, документацію | `node tools/check.mjs --agent-only` |
+| 7 | Завдання AI: агент на гілці `develop` | Створив manifest, 3 skills із шаблонами, 6 commands, `tools/apply-templates.mjs`, `tools/check.mjs`, адаптери Claude Code, документацію | `node tools/check.mjs --agent-only` → 17/17 |
+| 8 | Запит до окремого екземпляра AI-агента (без контексту розробки): «Виконай `/be-init` строго за `.github/agents/build-engineer.agent.md` і `.github/prompts/init.prompt.md`; не комітити, не пушити, не змінювати агентські файли» | Виконав 5 кроків (усі `OK`), `check` → 30/30; повторив `init`: усі шаблони `UNCHANGED`, SHA-256 17 файлів збігаються; надав 9 зауважень до інструкцій | Проєкт у гілці `feature/lab1-hello-ts` |
+| 9 | Завдання AI: виправити інструкції за зауваженнями агента (етап 4.3 методички — через AI, а не ручною зміною результату) | Коміт `797eb35` у `develop`: G4 перевіряє нові файли, `--dry-run` у командах, повний цикл у перевірках `create-build`, «очікує push» для CI, уточнення `check` і `init` | Повторне застосування шаблонів виправленою версією: 21/21 `UNCHANGED`, `check` 30/30 |
+| 10 | Завдання AI: зафіксувати результат і відкрити PR | Три коміти за етапами (create-project, create-build, create-actions), push, pull request #1 `lab1/finish` у `develop`. Push і PR виконав AI-асистент за дорученням студента («повністю зроби…»), а не агент `build-engineer`: агенту push заборонено маніфестом | PR запустив CI |
+| 11 | Завдання AI: перевірити CI | Запуск 39481423856 (`pull_request`): `ubuntu-latest` 15 с, `windows-latest` 38 с, `macos-latest` 40 с — усі `success`; artifacts `hello-Linux`, `hello-Windows`, `hello-macOS` | CI зелений на трьох ОС |
+| 12 | Завдання AI: продемонструвати реакцію на зламану перевірку | `toBe(5)` → `toBe(6)`: `[FAIL] B2`, код 1; без `macos-latest` у matrix: `[FAIL] W3`, код 1; після `git restore` — 30/30 | Демонстрація для звіту і відео |
+| 13 | Завдання AI: звіт у форматі Word за шаблоном кафедри ЕОМ (`звіт_практика.docx`) | Титульну сторінку скопійовано з шаблону (шрифти, інтервали, вирівнювання); основну частину оформлено за ДСТУ 3008 (TNR 14, інтервал 1,5, абзацний відступ 1,25 см, номери сторінок угорі праворуч); документ згенеровано python-docx, зміст і поля оновлено в Microsoft Word, кожну сторінку перевірено через PDF | Звіт `.docx` поза репозиторієм |
+| 14 | «Запустити нового агента для об'єктивної перевірки всієї виконаної роботи; якщо знайдуться недочоти, то виправ» | Окремий екземпляр AI без контексту розробки (лише читання) перевірив вимоги методички, репозиторій, PR, CI і звіт: відтворив запуск агента з `develop`, перевірив сценарії помилок; знайшов 1 критичне (умовне), 5 суттєвих і 13 дрібних зауважень | Перелік недоліків з доказами |
+| 15 | Завдання AI: виправити недоліки, знайдені рецензентом | Коміт `2c84315` у `develop` (посилено `check`: P3, B2, W4, нова P5; Node.js 24.20.0 у CI; виправлено `usage.md`), merge у `feature`, повторний `create-build`/`create-actions` для двох змінених шаблонів (коміт `3c4f5cb`); `check` → 31/31, усі спроби обходу перевірок дають `FAIL`; звіт виправлено | Недоліки усунено |
 
 ## Помилки та виправлення
 
 | № | Помилка (фактичний вивід) | Причина | Виправлення |
 |---|---|---|---|
 | 1 | `failed to authenticate via web browser: context deadline exceeded` під час `gh auth login` | одноразовий код (діє 15 хв) не підтвердили вчасно | вхід перезапущено з новим кодом, користувач підтвердив його в браузері |
-| 2 | `npm warn install-scripts ... esbuild@0.28.2 (postinstall: node install.js)` | npm 11 за замовчуванням не виконує install-скрипти пакетів | перевірено, що esbuild працює без postinstall (бінарник з optional dependency); додаткових дозволів не надавали |
+| 2 | `npm warn install-scripts ... esbuild@0.28.2 (postinstall: node install.js)` | npm 11 за замовчуванням не виконує install-скрипти пакетів | перевірено, що esbuild працює без postinstall (бінарник з optional dependency); попередження описано в skill build-and-test |
 | 3 | `warning: The signature seems corrupted!` від postject під час `npm run package` на Windows | копія `node.exe` має Authenticode-підпис, який стає недійсним після вбудовування | у `scripts/build-sea.mjs` додано зняття підпису з PE-заголовка перед вбудовуванням (аналог `signtool remove /s`); попередження зникло, `Get-AuthenticodeSignature` → `NotSigned`, файл працює |
 | 4 | `'ci.bat' is not recognized as an internal or external command` | у середовищі ввімкнено `NoDefaultCurrentDirectoryInExePath`: cmd не шукає програми в поточному каталозі | у workflow і документації скрипт викликається з явним шляхом `.\ci.bat` |
 | 5 | в адаптерах `.claude/commands/be-*.md` замість закривного апострофа після `.github/prompts/` стояла лапка | помилка екранування в shell-скрипті, яким AI генерував файли | виправлено `sed`, перевірено `grep` |
+| 6 | зауваження агента: перевірка секретів G4 не бачить нових файлів, бо читає лише `git ls-files` | на першому `init` увесь проєкт — ще не відстежувані файли | `git ls-files --cached --others --exclude-standard`; негативний тест із фальшивим токеном у новому файлі → `[FAIL] G4` |
+| 7 | зауваження агента: команди `create-build` і `create-actions` не мали `--dry-run`, перевірки команд і skills відрізнялися | неузгодженість інструкцій | кроки й перевірки вирівняно (коміт `797eb35`) |
+| 8 | зауваження агента: `ci.sh` потрапить у Git без біта виконання | Windows, `core.filemode=false` | `git add --chmod=+x ci.sh` (режим `100755`), крок додано в наступні кроки `init` і в skill |
+| 9 | помилка AI під час комітування: у двох комітах кожен рядок README виглядав зміненим | проміжні версії README записано через текстовий stdout Python на Windows, який замінив `\n` на `\r\n` | ще не опубліковані коміти перероблено (`git reset --mixed`, запис байтів із LF); у комітах README лише додавання: +17, +19, +10 рядків |
+| 10 | у демонстрації `[FAIL] B2` показував лише хвіст виводу Vitest без рядка `AssertionError` | `check.mjs` брав останні 12 рядків виводу | фільтр рядків `FAIL`/`AssertionError` (коміт `1fa0bc4`): `AssertionError: expected 5 to be 6 // Object.is equality` |
+
+| 11 | рецензент: `check` проходив з `it.skipIf(true)` для `BasicAddition`, з `continue-on-error` чи `if: false` у workflow і з `npm test \|\| true` у `ci.sh` | перевірки шукали лише `.skip`/`.todo`, не дивилися на пропущені тести, умови `if` і вміст скриптів | P3 — усі способи вимкнути тест; B2 — тест має бути виконаний, без `<skipped/>`; W4 — без `continue-on-error`, з фіксованими `if`; P5 — файли збігаються з шаблонами (`apply-templates --dry-run`); усі три обходи тепер дають `FAIL` |
+| 12 | рецензент: версія Node.js у CI «плавала» (24.21.0 / 24.22.0 між запусками), тож змінювався і виконуваний файл | `node-version: 24` бере версію з кешу runner | у шаблоні `ci.yml` — точна версія `24.20.0` (та сама, що локально) |
+| 13 | рецензент: команда порівняння з еталонною гілкою в `usage.md` показувала всі файли «видаленими» | після `/be-init` файли ще не відстежуються Git | `git add -A` і `git diff --cached feature/lab1-hello-ts --stat` |
+| 14 | рецензент: у збереженому `.docx` номери сторінок у змісті застарілі (16 із 32 рядків) | Word оновив зміст до завершення розбиття на сторінки, а експорт у PDF оновлював поля сам, тому перевірка через PDF цього не показала | перед оновленням змісту — `Repaginate()`, оновлення до стабілізації; номери звірено з фактичними сторінками заголовків |
+| 15 | помилка AI під час виправлень: у шаблон `ci-summary.mjs.tpl` замість `\b` у регулярному виразі потрапив керівний символ backspace (код 0x08) | екранування `\b` у рядку Python, яким AI редагував файл | символ замінено на `\b` окремим скриптом; `node --check` і пошук символу 0x08 в усіх файлах агента |
+
+Інформаційні повідомлення CI (не помилки): анотації GitHub про перехід мітки `ubuntu-latest` на Ubuntu 26 і черги
+на macOS arm64; у перших трьох запусках `setup-node` брав різні патчі Node.js 24 з кешу runner (24.21.0 і 24.22.0) — після
+перевірки це виправлено точною версією 24.20.0 (див. помилку 12).
 
 ## Прийняті рішення
 
@@ -42,11 +65,38 @@
 | 3 | Skills містять перевірені шаблони, `tools/apply-templates.mjs` застосовує їх ідемпотентно | відтворюваність develop → feature; повторний запуск не руйнує і не дублює файли |
 | 4 | `tools/check.mjs` — детермінована перевірка з кодом виходу | однаковий результат для людини, агента і демонстрації зламаної перевірки |
 | 5 | Виконуваний файл `hello` будується через Node.js SEA | нативний файл для кожної ОС, запускається без встановленого Node.js |
-| 6 | `ci.yml` лише робить checkout, встановлює Node.js 24 і викликає `ci.sh`/`ci.bat` | вимога методички; ті самі скрипти працюють локально |
+| 6 | `ci.yml` лише робить checkout, встановлює Node.js 24.20.0 і викликає `ci.sh`/`ci.bat` | вимога методички; ті самі скрипти працюють локально; точна версія Node.js — однаковий виконуваний файл |
 | 7 | Точні версії залежностей і `package-lock.json` у шаблоні | `npm ci` дає однаковий результат на всіх ОС |
 | 8 | `.gitattributes`: LF усюди, CRLF для `*.bat` | cmd некоректно обробляє мітки й `goto` у batch-файлах з LF |
 | 9 | Імпорти з розширенням `.ts` і `allowImportingTsExtensions` | каркас запускається відразу (`node src/main.ts`), тож крок `create-project` перевіряється окремо від складання |
+| 10 | Агента запущено окремим екземпляром AI без контексту розробки | доказ, що інструкцій у репозиторії достатньо для відтворення результату |
+| 11 | Виправлення вносяться в інструкції агента в `develop`, а `feature` отримує їх через merge | вимога етапу 4.3: виправляти агента, а не підправляти результат вручну |
+| 12 | Pull request без автоматичного призначення рецензента | методичка ЛР1 цього не вимагає; рецензента студент додає сам за потреби |
+| 13 | Скріншоти GitHub Education, Copilot і сторінки Actions та відео у звіті — виділені заглушки | їх може зробити лише студент у своєму акаунті; результати Actions у звіті подано з даних GitHub API |
+| 14 | Незалежна перевірка всієї роботи окремим екземпляром AI (лише читання) | правило 4.2 методички: результати AI переглядаються й перевіряються, а не приймаються бездумно |
+| 15 | Перевірка P5: згенеровані файли мають збігатися з шаблонами skills | будь-яка ручна зміна результату (зокрема «озеленення» скриптів CI) виявляється автоматично |
 
 ## Докази перевірки
 
-Результати перевірок додаються після запуску агента (гілка `feature/lab1-hello-ts`).
+Підсумковий звіт оркестратора `init` (запуск окремим екземпляром агента):
+
+| № | Команда | Статус | Створено / змінено | Перевірка |
+|---|---|---|---|---|
+| 1 | git-init | OK | `.gitignore`, `.gitattributes` (UNCHANGED) | `build/`, `node_modules/` ігноруються |
+| 2 | create-project | OK | `src/main.ts`, `src/greeting.ts` (CREATED), README (MERGED) | `node src/main.ts` → `Hello, World!` |
+| 3 | create-build | OK | 11 файлів (CREATED), README (MERGED) | `npm ci`, build, `Tests 2 passed`, `build\hello.exe` → `Hello, World!`, `.\ci.bat` → `CI OK` |
+| 4 | create-actions | OK | `.github/workflows/ci.yml` (CREATED), README (MERGED) | `check --only workflow` → W1–W5 OK |
+| 5 | check | OK | лише `build/` | `node tools/check.mjs` → 30/30, код 0 |
+
+- Повторний `init`: усі шаблони `UNCHANGED` (2 + 5 + 12 + 2), `git status --short` і SHA-256 17 файлів без змін.
+- Pull request: <https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/pull/1>
+- GitHub Actions: <https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/actions/runs/39481423856>
+  — `build-and-test (ubuntu-latest)` ✓, `(windows-latest)` ✓, `(macos-latest)` ✓.
+
+Після незалежної перевірки та виправлень (коміти `2c84315`, `3c4f5cb`):
+
+- `node tools/check.mjs` → 31/31 (нова перевірка P5);
+- спроби обійти перевірки дають `FAIL`: `it.skipIf(true)` для `BasicAddition` → P3, P5, B2; `continue-on-error`
+  і `if: false` у workflow → W4, P5; `npm test || true` у `ci.sh` → P5;
+- GitHub Actions, запуск CI #4: <https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/actions/runs/39493913573>
+  — три job ✓, Node.js v24.20.0 на всіх ОС, `2 tests, 0 failures, 0 errors, 0 skipped`.

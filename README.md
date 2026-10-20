@@ -67,3 +67,49 @@ GitHub Actions на Windows, Linux і macOS. Гілка `develop` містить
 | `feature/lab1-hello-ts` | повний проєкт, створений агентом, з CI |
 
 Pull request `lab1/finish`: `feature/lab1-hello-ts` → `develop`.
+
+<!-- project-scaffold:begin -->
+## Проєкт `hello-ts`
+
+Мінімальний кросплатформний застосунок Hello World на TypeScript (варіант 6: TypeScript · npm scripts · Vitest).
+
+| Файл | Призначення |
+|---|---|
+| `src/main.ts` | точка входу застосунку `hello` |
+| `src/greeting.ts` | функція `greet()`, що формує привітання |
+
+Швидкий запуск без складання (Node.js ≥ 22.18 виконує TypeScript напряму):
+
+```bash
+node src/main.ts
+```
+<!-- project-scaffold:end -->
+
+<!-- build-and-test:begin -->
+## Складання і тестування
+
+| Команда | Що робить |
+|---|---|
+| `npm ci` | встановлює залежності строго за `package-lock.json` |
+| `npm run build` | перевірка типів (`tsc --noEmit`) і бандл `build/hello.cjs` (esbuild) |
+| `npm test` | юніт-тести Vitest (`HelloTest > BasicAddition`), JUnit-звіт у `build/test-results/` |
+| `npm run package` | виконуваний файл `build/hello` або `build/hello.exe` (Node.js SEA) |
+| `npm start` | запуск зібраного `build/hello.cjs` |
+
+Повний цикл однією командою, так само як у CI:
+
+```bash
+bash ci.sh     # Linux, macOS, Git Bash
+.\ci.bat       # Windows (cmd, PowerShell)
+```
+<!-- build-and-test:end -->
+
+<!-- github-actions:begin -->
+## Неперервна інтеграція
+
+[![CI](https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/actions/workflows/ci.yml/badge.svg)](https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/actions/workflows/ci.yml)
+
+Workflow `.github/workflows/ci.yml` запускається на `push` і `pull_request` до `develop` та `master`
+(а також вручну) і в одній job з matrix виконує `ci.sh` (Ubuntu, macOS) або `ci.bat` (Windows).
+Виконуваний файл `hello` для кожної ОС і JUnit-звіт зберігаються як artifacts запуску.
+<!-- github-actions:end -->
