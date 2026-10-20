@@ -66,7 +66,7 @@ flowchart TB
 | користувач → `init` | `projectName` (за замовчуванням `hello-ts`) |
 | `init` → `create-project`, `create-build` | `PROJECT_NAME`, `LANGUAGE=TypeScript` |
 | `git remote` → `create-actions` | `REPO_SLUG` (`owner/repo`) для бейджа CI |
-| `apply-templates` → агент | статус кожного файла: `CREATED`, `MERGED`, `UNCHANGED`, `CONFLICT` |
+| `apply-templates` → агент | статус кожного файлу: `CREATED`, `MERGED`, `UNCHANGED`, `CONFLICT` |
 | `create-build` → `check`, CI | `build/hello.cjs`, `build/hello(.exe)`, `build/test-results/junit.xml` |
 | `check` → користувач | таблиця `[ OK ]`/`[FAIL]`, `build/check-report.md`, код виходу |
 
