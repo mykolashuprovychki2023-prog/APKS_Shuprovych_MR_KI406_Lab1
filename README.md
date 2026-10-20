@@ -103,3 +103,13 @@ bash ci.sh     # Linux, macOS, Git Bash
 .\ci.bat       # Windows (cmd, PowerShell)
 ```
 <!-- build-and-test:end -->
+
+<!-- github-actions:begin -->
+## Неперервна інтеграція
+
+[![CI](https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/actions/workflows/ci.yml/badge.svg)](https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/actions/workflows/ci.yml)
+
+Workflow `.github/workflows/ci.yml` запускається на `push` і `pull_request` до `develop` та `master`
+(а також вручну) і в одній job з matrix виконує `ci.sh` (Ubuntu, macOS) або `ci.bat` (Windows).
+Виконуваний файл `hello` для кожної ОС і JUnit-звіт зберігаються як artifacts запуску.
+<!-- github-actions:end -->
