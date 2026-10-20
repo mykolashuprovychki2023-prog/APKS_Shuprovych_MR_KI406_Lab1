@@ -37,7 +37,7 @@ argument-hint: "LANGUAGE=TypeScript PROJECT_NAME=hello-ts"
 | `.gitattributes` | merge-lines | LF для всіх файлів, CRLF для `*.bat` |
 | `README.md` | block `project-scaffold` | опис проєкту і команда запуску `node src/main.ts` |
 
-Режими: `create` — створити, якщо файла немає; `merge-lines` — дописати відсутні рядки;
+Режими: `create` — створити, якщо файлу немає; `merge-lines` — дописати відсутні рядки;
 `block` — вставити розділ між маркерами `<!-- project-scaffold:begin/end -->`. Змінений вручну файл
 ніколи не перезаписується (статус `CONFLICT`).
 
@@ -88,7 +88,7 @@ argument-hint: "LANGUAGE=TypeScript PROJECT_NAME=hello-ts"
 
 **Типовий сценарій помилки:** користувач запускає `/be-create-project` з `LANGUAGE=Rust`. Інструмент
 завершується з кодом 1 і повідомленням `LANGUAGE=Rust is not supported ... (allowed: TypeScript)`. Агент
-не створює жодного файла, зупиняє `init` на кроці 2 і пояснює, що цей агент налаштований на варіант 6.
+не створює жодного файлу, зупиняє `init` на кроці 2 і пояснює, що цей агент налаштований на варіант 6.
 
 ## Файли шаблонів
 
