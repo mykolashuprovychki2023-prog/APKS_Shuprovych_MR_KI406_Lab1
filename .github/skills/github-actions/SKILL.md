@@ -1,96 +1,89 @@
 ---
 name: github-actions
-description: Створює workflow .github/workflows/ci.yml з однією job і matrix ubuntu-latest, windows-latest, macos-latest, який лише викликає ci.sh або ci.bat і зберігає виконувані файли та JUnit-звіт як artifacts. Використовуй для команди create-actions.
-argument-hint: "REPO_SLUG=owner/repo"
+description: Створює .github/workflows/ci.yml — одна job з matrix ubuntu-latest, windows-latest, macos-latest, яка лише викликає ci.sh або ci.bat і зберігає виконуваний файл та звіт тестів як artifacts. Використовуй для команди create-actions.
 ---
 
 # Skill: github-actions
 
-Налаштовує неперервну інтеграцію в GitHub Actions. Уся логіка складання лишається у скриптах
-`ci.sh`/`ci.bat` (skill `build-and-test`), тож локальний запуск і CI виконують однакові кроки.
-
 ## Коли застосовувати
 
-- Команда `create-actions` (крок 4 оркестратора `init`) після `create-build`.
-- Відновлення workflow після випадкового видалення чи пошкодження.
+Команда `create-actions` після `create-build`.
 
 ## Вхідні дані
 
-| Параметр | Обов'язковий | За замовчуванням | Опис |
-|---|---|---|---|
-| `REPO_SLUG` | ні | `mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1` | `owner/repo` для бейджа CI у README |
-
-Визнач `REPO_SLUG` з `git remote get-url origin` (частина `owner/repo` без `.git`). Якщо віддаленого
-репозиторію ще немає — використай значення за замовчуванням.
-Передумови: виконано `create-build` (є `ci.sh`, `ci.bat`, `package.json`).
+Файли `ci.sh` і `ci.bat` від `create-build`. Параметрів немає.
 
 ## Результат
 
-| Файл | Режим | Призначення |
-|---|---|---|
-| `.github/workflows/ci.yml` | create | workflow `CI` |
-| `README.md` | block `github-actions` | бейдж і опис CI |
+Файл створюється за правилом `CREATED` / `UNCHANGED` / `CONFLICT` з маніфесту. Тригери — `push` і `pull_request`
+до `develop` та `master`; одна job з matrix трьох ОС; кроки — checkout, Node.js 24.20.0, виклик `ci.sh` або `ci.bat`,
+artifacts (виконуваний файл і JUnit-звіт). Логіки складання і секретів у workflow немає.
 
-Властивості workflow:
+### `.github/workflows/ci.yml`
 
-- тригери: `push` і `pull_request` до `develop` та `master`, а також ручний `workflow_dispatch`;
-- одна job `build-and-test` з `strategy.matrix.os: [ubuntu-latest, windows-latest, macos-latest]`, `fail-fast: false`;
-- кроки: `actions/checkout@v7` → `actions/setup-node@v7` (точна версія Node.js 24.20.0, та сама, що локально) → `bash ./ci.sh` або `.\ci.bat` → `actions/upload-artifact@v7` (artifacts зберігаються 90 днів);
-- кроки зі скриптами мають фіксовані умови `if: runner.os != 'Windows'` / `if: runner.os == 'Windows'`, `continue-on-error` заборонено;
-- мінімальні права `permissions: contents: read`, жодних секретів.
+```yaml
+# CI: one job with a matrix of three OSes; all build logic is in ci.sh / ci.bat.
+name: CI
 
-## Порядок дій
+on:
+  push:
+    branches: [develop, master]
+  pull_request:
+    branches: [develop, master]
 
-1. Визнач `REPO_SLUG` (див. «Вхідні дані»).
-2. `node tools/apply-templates.mjs github-actions --var REPO_SLUG=<owner/repo> --dry-run`, потім без `--dry-run`.
-3. Перевір workflow: `node tools/check.mjs --only workflow`.
-4. Якщо віддалений репозиторій і `gh` доступні, після push користувача покажи статус запусків:
-   `gh run list --workflow ci.yml --limit 3`. Сам push виконує користувач.
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.20.0
+      - name: Build and test (ci.sh)
+        if: runner.os != 'Windows'
+        run: bash ./ci.sh
+      - name: Build and test (ci.bat)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: .\ci.bat
+      - name: Upload executable and test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hello-${{ runner.os }}
+          path: |
+            build/hello
+            build/hello.exe
+            build/test-results/junit.xml
+```
 
 ## Перевірка
 
-| Що перевіряємо | Команда | Очікуваний результат |
+| Що | Команда | Очікування |
 |---|---|---|
-| YAML коректний | `node tools/check.mjs --only workflow` (W1) | `[ OK ] W1` |
-| Тригери develop/master | те саме (W2) | `[ OK ] W2` |
-| Matrix з трьох ОС, одна job | те саме (W3) | `[ OK ] W3` |
-| Лише виклики `ci.sh`/`ci.bat`, без `continue-on-error` і змінених `if` | те саме (W4) | `[ OK ] W4` |
-| Artifacts і відсутність секретів | те саме (W5) | `[ OK ] W5` |
-| Запуск у GitHub (після push або PR користувача, поза `init`) | `gh run list --workflow ci.yml` | три job зі статусом `success` |
+| YAML, тригери, matrix, кроки, artifacts | `node tools/check.mjs --only workflow` | W1–W5 `[ OK ]` |
+| запуск у GitHub (після push користувача) | вкладка Actions або `gh run list --workflow ci.yml` | три job `success` |
 
 ## Обробка помилок
 
-| Симптом | Причина | Дія агента |
+| Симптом | Причина | Дія |
 |---|---|---|
-| `[FAIL] W1 ... YAML` | синтаксична помилка (відступи, табуляції) | показати рядок помилки; виправити шаблон через skill, а не вручну в результаті |
-| `[FAIL] W4 ... зайві run` | у workflow додано команди складання | прибрати їх: логіка складання має бути в `ci.sh`/`ci.bat` |
+| `[FAIL] W1` | синтаксична помилка YAML (відступи, табуляції) | показати рядок помилки, відновити файл за skill |
+| `[FAIL] W4 ... npm test (if: -)` | у workflow додано команду складання | перенести її в `ci.sh` / `ci.bat` |
 | job `windows-latest` падає на `ci.bat` | файл має LF замість CRLF | перевірити `.gitattributes` (`*.bat text eol=crlf`) |
-| `refusing to allow an OAuth App to create or update workflow` під час push | токен без scope `workflow` | повідомити користувача: `gh auth refresh -s workflow` |
-| `CONFLICT .github/workflows/ci.yml` | workflow змінено вручну | не перезаписувати; показати різницю, запитати користувача |
+| push відхилено: `refusing to allow an OAuth App to create or update workflow` | токен без scope `workflow` | користувач виконує `gh auth refresh -s workflow` |
 
 ## Приклад
 
-**Вхід:** `REPO_SLUG=mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1`.
-
-```text
-> node tools/apply-templates.mjs github-actions --var REPO_SLUG=mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1
-  CREATED   .github/workflows/ci.yml
-  MERGED    README.md
-> node tools/check.mjs --only workflow
-[ OK ] W1    YAML workflow синтаксично коректний
-[ OK ] W2    Тригери: push і pull_request до develop та master
-[ OK ] W3    Одна job з matrix: ubuntu-latest, windows-latest, macos-latest
-[ OK ] W4    Кроки: checkout і лише виклики ci.sh / ci.bat
-[ OK ] W5    Результат job зберігається (artifact), секретів у workflow немає
-```
-
-**Очікуваний результат:** після push у GitHub Actions з'являються три job `build-and-test (...)`.
-
-**Типовий сценарій помилки:** у workflow вручну додали крок `run: npm test`. Перевірка W4 падає
-(`зайві run: npm test`), `check` повертає код 1, агент пропонує перенести команду в `ci.sh`/`ci.bat`.
-
-## Файли шаблонів
-
-- [files.json](./templates/files.json)
-- [ci.yml](./templates/ci.yml.tpl)
-- [розділ README](./templates/README.section.md.tpl)
+- **Вхід:** є `ci.sh` і `ci.bat`.
+- **Очікуваний результат:** `CREATED .github/workflows/ci.yml`; `check --only workflow` → W1–W5 OK; після push —
+  три job `build-and-test (...)` зі статусом `success`.
+- **Типовий сценарій помилки:** у workflow вручну додали крок `run: npm test`. W4 падає (`npm test (if: -)`),
+  `check` повертає код 1, агент пропонує перенести команду в `ci.sh` / `ci.bat`.

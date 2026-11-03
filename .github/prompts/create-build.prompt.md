@@ -1,13 +1,13 @@
 ---
 name: be-create-build
-description: "create-build: викликає skill build-and-test — система складання, тест BasicAddition, виконуваний файл hello, ci.sh/ci.bat"
+description: "create-build: викликає skill build-and-test — система складання, тест BasicAddition, виконуваний файл hello, ci.sh і ci.bat"
 agent: build-engineer
 argument-hint: "projectName=hello-ts"
 ---
 
 # Команда create-build
 
-Налаштовує складання, тести і пакування за skill [build-and-test](../skills/build-and-test/SKILL.md).
+Налаштовує складання і тести за skill [build-and-test](../skills/build-and-test/SKILL.md).
 
 ## Вхідні дані
 
@@ -15,51 +15,31 @@ argument-hint: "projectName=hello-ts"
 
 ## Передумови
 
-- Виконано `create-project`: існує `src/main.ts`.
-- Node.js ≥ 22.18 і npm: `node --version`, `npm --version`.
-- Доступ до npm registry (для `npm ci`).
+- Виконано `create-project`: є `src/main.ts`.
+- Node.js ≥ 22.18 і npm, доступ до npm registry.
 
 ## Дії
 
-1. Прочитай [SKILL.md](../skills/build-and-test/SKILL.md).
-2. Попередній перегляд: `node tools/apply-templates.mjs build-and-test --var PROJECT_NAME=<назва> --dry-run`.
-3. Застосуй шаблони: та сама команда без `--dry-run`. Якщо є `CONFLICT` — зупинись.
-4. Встанови залежності: `npm ci --no-audit --no-fund` (попередження `npm warn install-scripts ... esbuild` очікуване).
-5. Склади проєкт: `npm run build`.
-6. Запусти тести: `npm test`.
-7. Створи виконуваний файл: `npm run package`, потім запусти `build/hello` (Windows: `build\hello.exe`).
-8. Перевір повний цикл, як у CI: `bash ci.sh` (Linux, macOS, Git Bash) або `.\ci.bat` (Windows).
-9. Після кожного кроку наведи фактичний вивід; на першій помилці зупинись.
+1. Створи файли зі skill.
+2. Якщо немає `package-lock.json` — `npm install --no-audit --no-fund`.
+3. Запусти повний цикл: `.\ci.bat` (Windows) або `bash ci.sh` (Linux, macOS).
 
 ## Очікувані файли
 
-- `package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`, `sea-config.json`
-- `src/math.ts`, `tests/basic.test.ts`
-- `scripts/build-sea.mjs`, `scripts/ci-summary.mjs`, `ci.sh`, `ci.bat`
-- `README.md` з блоком `<!-- build-and-test:begin -->`
-- Артефакти лише в `build/`: `hello.cjs`, `hello` / `hello.exe`, `test-results/junit.xml`
-
-`ci.sh` має бути виконуваним у Git. На Windows (`core.filemode=false`) біт виконання не записується
-автоматично, тому під час коміту користувач додає файл командою `git add --chmod=+x ci.sh`.
+`package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`, `sea-config.json`, `src/math.ts`,
+`tests/basic.test.ts`, `scripts/build-sea.mjs`, `ci.sh`, `ci.bat`. Артефакти — лише в `build/`.
 
 ## Перевірка
 
-| Перевірка | Команда | Очікування |
+| Що | Команда | Очікування |
 |---|---|---|
-| Залежності | `npm ci --no-audit --no-fund` | код 0, `package-lock.json` не змінено |
-| Складання | `npm run build` | код 0, є `build/hello.cjs` |
-| Тести | `npm test` | `Tests 2 passed`, `BasicAddition` у JUnit |
-| Виконуваний файл | `build/hello` (Windows: `build\hello.exe`) | вивід містить `Hello, World!` |
-| Повний цикл | `bash ci.sh` або `.\ci.bat` | останній рядок `==== CI OK ====`, код 0 |
+| повний цикл | `.\ci.bat` або `bash ci.sh` | останній рядок `==== CI OK ====` |
+| тест | вивід `npm test` | `HelloTest > BasicAddition` пройдено, `2 passed` |
+| виконуваний файл | `build\hello.exe` або `build/hello` | `Hello, World!` |
 | Git | `git status --short` | немає `build/` і `node_modules/` |
 
 ## Повідомлення про помилку
 
-- `create-build: FAILED на кроці npm ci — <причина>. Дія: перевірте мережу / узгодженість package-lock.json.`
-- `create-build: FAILED на кроці build — <помилка tsc>. Дія: виправте тип у <файл:рядок>.`
-- `create-build: FAILED на кроці test — BasicAddition: <очікування>. Дія: виправте add(), тест не вимикати.`
-- `create-build: FAILED на кроці package — <причина>. Дія: спочатку npm run build.`
-
-## Повторний запуск
-
-Безпечний: шаблони дають `UNCHANGED`, `npm ci` перевстановлює `node_modules/`, складання перезаписує лише `build/`.
+- `create-build: FAILED — тест BasicAddition не пройшов. Дія: перевірте add() у src/math.ts.`
+- `create-build: FAILED — npm ENOTFOUND. Дія: перевірте доступ до інтернету і повторіть команду.`
+- `create-build: CONFLICT — package.json змінено вручну. Дія: перегляньте різницю і вирішіть, який варіант залишити.`

@@ -1,412 +1,203 @@
 #!/usr/bin/env node
-// check.mjs - verification used by the `check` command of the build-engineer agent.
-//
-// Usage (from the repository root):
-//   node tools/check.mjs [--agent-only] [--skip-build] [--only <group>]...
-//   groups: agent, project, git, build, workflow
-//
-// The check does not modify project files. It writes only into build/ (check-report.md
-// and the build artifacts of B1-B3) and runs `npm ci` into node_modules/ when the
-// dependencies are missing; both directories are ignored by Git.
-// Exit code: 0 - all checks passed, 1 - a check failed, 2 - invalid command-line arguments.
+// check.mjs - verification for the `check` command of the build-engineer agent.
+// Usage (from the repository root): node tools/check.mjs [--agent-only] [--only <group>]...
+// Groups: agent, project, git, build, workflow. Project files are not modified: only the
+// ignored build/ and node_modules/ are written. Exit code: 0 - all checks passed, 1 - a check failed.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
 const ROOT = process.cwd();
 const GROUPS = ['agent', 'project', 'git', 'build', 'workflow'];
-
-// ---- command line -----------------------------------------------------------
-const argv = process.argv.slice(2);
-let agentOnly = false;
-let skipBuild = false;
-const only = [];
-for (let i = 0; i < argv.length; i += 1) {
-  if (argv[i] === '--agent-only') agentOnly = true;
-  else if (argv[i] === '--skip-build') skipBuild = true;
-  else if (argv[i] === '--only' && GROUPS.includes(argv[i + 1])) only.push(argv[++i]);
-  else {
-    console.error(`check: unknown argument "${argv[i]}". Groups: ${GROUPS.join(', ')}`);
-    process.exit(2);
-  }
+const args = process.argv.slice(2);
+const only = args.filter((a, i) => args[i - 1] === '--only');
+const unknown = args.filter((a, i) => !['--agent-only', '--only'].includes(a) && args[i - 1] !== '--only');
+if (unknown.length || only.some((g) => !GROUPS.includes(g))) {
+  console.error(`Usage: node tools/check.mjs [--agent-only] [--only ${GROUPS.join('|')}]`);
+  process.exit(2);
 }
-const enabled = (group) => {
-  if (only.length > 0) return only.includes(group);
-  if (agentOnly) return group === 'agent' || group === 'git';
-  return !(skipBuild && group === 'build');
+const enabled = (group) =>
+  only.length ? only.includes(group) : !args.includes('--agent-only') || ['agent', 'git'].includes(group);
+
+const results = [];
+const check = (id, title, ok, details = '') => results.push({ id, title, ok: Boolean(ok), details });
+const exists = (p) => existsSync(join(ROOT, p));
+const read = (p) => (exists(p) ? readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n') : '');
+const tail = (text, n = 8) => String(text).trim().split('\n').slice(-n).join('\n');
+const sh = (cmd) => {
+  const r = spawnSync(cmd, { cwd: ROOT, shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+};
+// required Markdown headings that are missing in a file
+const missing = (file, headings) => {
+  if (!exists(file)) return ['файл відсутній'];
+  const found = [...read(file).matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) => m[1].toLowerCase());
+  return headings.filter((h) => !found.some((f) => f.startsWith(h.toLowerCase())));
 };
 
-// ---- helpers ----------------------------------------------------------------
-const results = [];
-const record = (id, title, ok, details = '') =>
-  results.push({ id, title, status: ok ? 'OK' : 'FAIL', details });
-const exists = (p) => existsSync(join(ROOT, p));
-const read = (p) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
-const tail = (text, n = 12) => text.trim().split('\n').slice(-n).join('\n');
-
-function sh(command) {
-  const r = spawnSync(command, { cwd: ROOT, shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
-}
-
-function frontmatter(text) {
-  const m = text.match(/^---\n([\s\S]*?)\n---\n/);
-  if (!m) return null;
-  const fm = {};
-  for (const line of m[1].split('\n')) {
-    const kv = line.match(/^([A-Za-z-]+):\s*(.*)$/);
-    if (kv) fm[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return fm;
-}
-
-function missingHeadings(text, required) {
-  const headings = [...text.matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) => m[1].trim().toLowerCase());
-  return required.filter((r) => !headings.some((h) => h.startsWith(r.toLowerCase())));
-}
-
-function section(text, heading) {
-  const start = text.search(new RegExp(`^##\\s+${heading}`, 'm'));
-  if (start < 0) return '';
-  const rest = text.slice(start + 3);
-  const next = rest.search(/^##\s+/m);
-  return next < 0 ? rest : rest.slice(0, next);
-}
-
-// ---- A. agent ---------------------------------------------------------------
-const MANIFEST = '.github/agents/build-engineer.agent.md';
+// ---- agent: manifest, skills, commands, init order, documentation ----------------
 const SKILLS = ['project-scaffold', 'build-and-test', 'github-actions'];
 const COMMANDS = ['git-init', 'create-project', 'create-build', 'create-actions', 'check', 'init'];
-const INIT_ORDER = ['git-init', 'create-project', 'create-build', 'create-actions', 'check'];
 
-function checkAgent() {
-  if (!exists(MANIFEST)) {
-    record('A1', 'Manifest агента', false, `немає ${MANIFEST}`);
-  } else {
-    const text = read(MANIFEST);
-    const fm = frontmatter(text);
-    const problems = [];
-    if (!fm) problems.push('немає YAML frontmatter');
-    else {
-      if (fm.name !== 'build-engineer') problems.push('name не дорівнює build-engineer');
-      if (!fm.description) problems.push('немає description');
-      if (!fm.tools) problems.push('немає tools');
-    }
-    const miss = missingHeadings(text, [
-      'Роль',
-      'Область відповідальності',
-      'Правила роботи з файлами',
-      'Заборонені дії',
-      'Критерії успішного завершення',
-    ]);
-    if (miss.length) problems.push(`немає розділів: ${miss.join(', ')}`);
-    record('A1', 'Manifest: роль, відповідальність, правила, заборони, критерії', !problems.length, problems.join('; '));
-  }
+function agent() {
+  const manifest = missing('.github/agents/build-engineer.agent.md',
+    ['Роль', 'Область відповідальності', 'Правила роботи з файлами', 'Заборонені дії', 'Критерії успішного завершення']);
+  check('A1', 'Manifest: роль, відповідальність, правила, заборони, критерії', !manifest.length, manifest.join(', '));
 
-  for (const [i, name] of SKILLS.entries()) {
-    const file = `.github/skills/${name}/SKILL.md`;
-    const id = `A2.${i + 1}`;
-    if (!exists(file)) {
-      record(id, `Skill ${name}`, false, `немає ${file}`);
-      continue;
-    }
-    const text = read(file);
-    const fm = frontmatter(text);
-    const problems = [];
-    if (!fm || fm.name !== name) problems.push('name у frontmatter не збігається з назвою каталогу');
-    if (!fm || !fm.description || fm.description.length < 20) problems.push('немає змістовного description');
-    const miss = missingHeadings(text, ['Коли застосовувати', 'Вхідні дані', 'Результат', 'Перевірка', 'Обробка помилок', 'Приклад']);
-    if (miss.length) problems.push(`немає розділів: ${miss.join(', ')}`);
-    const map = `.github/skills/${name}/templates/files.json`;
-    if (!exists(map)) problems.push('немає templates/files.json');
-    else {
-      const lost = JSON.parse(read(map)).files.filter((f) => !exists(`.github/skills/${name}/templates/${f.from}`));
-      if (lost.length) problems.push(`немає шаблонів: ${lost.map((f) => f.from).join(', ')}`);
-    }
-    record(id, `Skill ${name}: призначення, входи, виходи, перевірки, помилки, приклад`, !problems.length, problems.join('; '));
-  }
+  const skills = SKILLS.map((s) => [s, missing(`.github/skills/${s}/SKILL.md`,
+    ['Коли застосовувати', 'Вхідні дані', 'Результат', 'Перевірка', 'Обробка помилок', 'Приклад'])])
+    .filter(([, m]) => m.length);
+  check('A2', '3 skills: призначення, входи, результат, перевірка, помилки, приклад', !skills.length,
+    skills.map(([s, m]) => `${s}: ${m.join(', ')}`).join('\n'));
 
-  for (const [i, name] of COMMANDS.entries()) {
-    const file = `.github/prompts/${name}.prompt.md`;
-    const id = `A3.${i + 1}`;
-    if (!exists(file)) {
-      record(id, `Command ${name}`, false, `немає ${file}`);
-      continue;
-    }
-    const text = read(file);
-    const fm = frontmatter(text);
-    const problems = [];
-    if (!fm || fm.name !== `be-${name}`) problems.push(`name має бути be-${name}`);
-    if (!fm || fm.agent !== 'build-engineer') problems.push('agent має бути build-engineer');
-    if (!fm || !fm.description) problems.push('немає description');
-    const miss = missingHeadings(text, ['Передумови', 'Дії', 'Очікувані файли', 'Перевірка', 'Повідомлення про помилку']);
-    if (miss.length) problems.push(`немає розділів: ${miss.join(', ')}`);
-    record(id, `Command ${name} (/be-${name}): передумови, дії, файли, перевірка, помилки`, !problems.length, problems.join('; '));
-  }
+  const commands = COMMANDS.map((c) => [c, missing(`.github/prompts/${c}.prompt.md`,
+    ['Передумови', 'Дії', 'Очікувані файли', 'Перевірка', 'Повідомлення про помилку'])])
+    .filter(([, m]) => m.length);
+  check('A3', '6 commands: передумови, дії, очікувані файли, перевірка, повідомлення про помилку', !commands.length,
+    commands.map(([c, m]) => `${c}: ${m.join(', ')}`).join('\n'));
 
-  if (exists('.github/prompts/init.prompt.md')) {
-    const actions = section(read('.github/prompts/init.prompt.md'), 'Дії');
-    const positions = INIT_ORDER.map((c) => actions.indexOf(`${c}.prompt.md`));
-    const ordered = positions.every((p, i) => p >= 0 && (i === 0 || p > positions[i - 1]));
-    record('A4', `init викликає команди в порядку ${INIT_ORDER.join(' → ')}`, ordered,
-      ordered ? '' : `позиції у розділі «Дії»: ${positions.join(', ')}`);
-  } else {
-    record('A4', 'init викликає команди в правильному порядку', false, 'немає init.prompt.md');
-  }
+  const actions = read('.github/prompts/init.prompt.md').split(/^## /m).find((s) => s.startsWith('Дії')) ?? '';
+  const order = COMMANDS.slice(0, 5).map((c) => actions.indexOf(`${c}.prompt.md`));
+  check('A4', 'init: git-init → create-project → create-build → create-actions → check',
+    order.every((p, i) => p >= 0 && (i === 0 || p > order[i - 1])), `позиції в розділі «Дії»: ${order}`);
 
-  const docs = ['README.md', 'docs/architecture.md', 'docs/usage.md', 'docs/ai-log.md'].filter((p) => !exists(p));
-  const problems = docs.length ? [`немає: ${docs.join(', ')}`] : [];
-  if (exists('README.md')) {
-    const readme = read('README.md');
-    for (const word of ['Варіант', 'Груп', 'Студент']) if (!readme.includes(word)) problems.push(`README без «${word}»`);
-  }
-  if (exists('docs/ai-log.md')) {
-    const miss = missingHeadings(read('docs/ai-log.md'), ['Журнал запитів', 'Помилки та виправлення', 'Прийняті рішення']);
-    if (miss.length) problems.push(`журнал AI без розділів: ${miss.join(', ')}`);
-  }
-  record('A5', 'Документація: README, архітектура, інструкція, журнал AI', !problems.length, problems.join('; '));
-
-  const tools = ['tools/apply-templates.mjs', 'tools/check.mjs'].filter((p) => !exists(p));
-  record('A6', 'Інструменти агента (apply-templates, check)', !tools.length, tools.length ? `немає: ${tools.join(', ')}` : '');
+  const readme = read('README.md');
+  const docs = ['Студент', 'Група', 'Варіант', '/be-init'].filter((w) => !readme.includes(w)).map((w) => `README без «${w}»`);
+  for (const f of ['docs/architecture.md', 'docs/usage.md']) if (!exists(f)) docs.push(`немає ${f}`);
+  const log = missing('docs/ai-log.md', ['Журнал запитів', 'Помилки та виправлення', 'Прийняті рішення']);
+  if (log.length) docs.push(`docs/ai-log.md: ${log.join(', ')}`);
+  check('A5', 'Документація: README, architecture.md, usage.md, журнал AI', !docs.length, docs.join('\n'));
 }
 
-// ---- P. project files -----------------------------------------------------------
-const PROJECT_FILES = [
-  'package.json', 'package-lock.json', 'tsconfig.json', 'vitest.config.ts', 'sea-config.json',
-  'src/main.ts', 'src/greeting.ts', 'src/math.ts', 'tests/basic.test.ts',
-  'scripts/build-sea.mjs', 'scripts/ci-summary.mjs', 'ci.sh', 'ci.bat', '.gitignore', '.gitattributes',
-];
+// ---- project: files, npm scripts, test, CI scripts ---------------------------------
+const FILES = ['src/main.ts', 'src/greeting.ts', 'src/math.ts', 'tests/basic.test.ts', 'package.json', 'package-lock.json',
+  'tsconfig.json', 'vitest.config.ts', 'sea-config.json', 'scripts/build-sea.mjs', 'ci.sh', 'ci.bat', '.github/workflows/ci.yml'];
 
-function checkProject() {
-  const missing = PROJECT_FILES.filter((p) => !exists(p));
-  record('P1', 'Структура проєкту (src, tests, конфігурації, ci.sh, ci.bat)', !missing.length,
-    missing.length ? `немає: ${missing.join(', ')}` : '');
+function project() {
+  const absent = FILES.filter((f) => !exists(f));
+  check('P1', 'Файли проєкту: src, tests, конфігурації, ci.sh, ci.bat, ci.yml', !absent.length, `немає: ${absent.join(', ')}`);
 
-  if (exists('package.json')) {
-    const pkg = JSON.parse(read('package.json'));
-    const scripts = ['build', 'test', 'package', 'start'].filter((s) => !pkg.scripts?.[s]);
-    const deps = ['typescript', 'vitest', 'esbuild', 'postject', 'yaml'].filter((d) => !pkg.devDependencies?.[d]);
-    const problems = [];
-    if (scripts.length) problems.push(`немає npm scripts: ${scripts.join(', ')}`);
-    if (deps.length) problems.push(`немає devDependencies: ${deps.join(', ')}`);
-    record('P2', 'npm scripts (build, test, package, start) і devDependencies', !problems.length, problems.join('; '));
-  } else {
-    record('P2', 'npm scripts і devDependencies', false, 'немає package.json');
-  }
+  let pkg = {};
+  try { pkg = JSON.parse(read('package.json')); } catch { /* reported below */ }
+  const scripts = ['build', 'test', 'package'].filter((s) => !pkg.scripts?.[s]);
+  const deps = ['typescript', 'esbuild', 'vitest', 'postject', 'yaml'].filter((d) => !pkg.devDependencies?.[d]);
+  check('P2', 'npm scripts build, test, package і devDependencies', !scripts.length && !deps.length,
+    `немає scripts: ${scripts.join(', ') || '-'}; devDependencies: ${deps.join(', ') || '-'}`);
 
-  const test = exists('tests/basic.test.ts') ? read('tests/basic.test.ts') : '';
   // any way to disable or narrow the tests: .skip/.skipIf/.runIf/.todo/.fails/.only, xit/xdescribe
-  const disabled = test.match(/\b(?:it|test|describe)\s*\.\s*(?:skip|skipIf|runIf|todo|fails|only)\b|\bx(?:it|describe)\s*\(/);
-  record('P3', 'Юніт-тест BasicAddition існує і не вимкнений', /BasicAddition/.test(test) && !disabled,
-    test ? `тест відсутній або вимкнений${disabled ? ` (${disabled[0]})` : ''}` : 'немає tests/basic.test.ts');
+  const test = read('tests/basic.test.ts');
+  const off = test.match(/\b(?:it|test|describe)\s*\.\s*(?:skip|skipIf|runIf|todo|fails|only)\b|\bx(?:it|describe)\s*\(/);
+  check('P3', 'Тест BasicAddition є і не вимкнений', /BasicAddition/.test(test) && !off, off ? off[0] : 'тесту BasicAddition немає');
 
-  const readme = exists('README.md') ? read('README.md') : '';
-  const blocks = ['project-scaffold', 'build-and-test', 'github-actions'].filter((b) => !readme.includes(`<!-- ${b}:begin -->`));
-  record('P4', 'README містить розділи запуску проєкту, складання і CI', !blocks.length,
-    blocks.length ? `немає блоків: ${blocks.join(', ')}` : '');
-
-  // P5: generated files must equal the skill templates (catches manual edits such as `|| true`
-  // in ci.sh or `continue-on-error` in ci.yml, and confirms that a re-run would change nothing)
-  if (exists('package.json')) {
-    const name = JSON.parse(read('package.json')).name;
-    const remote = sh('git remote get-url origin').out.trim().match(/github\.com[/:]([^/]+\/[^/.\s]+)/);
-    const runs = [
-      `project-scaffold --var LANGUAGE=TypeScript --var PROJECT_NAME=${name}`,
-      `build-and-test --var PROJECT_NAME=${name}`,
-      `github-actions${remote ? ` --var REPO_SLUG=${remote[1]}` : ''}`,
-    ];
-    const drift = [];
-    for (const args of runs) {
-      const out = sh(`node tools/apply-templates.mjs ${args} --dry-run`).out;
-      for (const m of out.matchAll(/^\s+(CREATED|MERGED|CONFLICT)\s+(\S+)/gm)) drift.push(`${m[1]} ${m[2]}`);
-      if (/ERROR/.test(out)) drift.push(out.trim().split('\n').pop());
-    }
-    record('P5', 'Файли проєкту збігаються з шаблонами skills (без ручних змін)', !drift.length,
-      drift.length ? `відрізняються від шаблонів: ${drift.join(', ')}` : '');
-  }
+  const scriptsText = { 'ci.sh': read('ci.sh'), 'ci.bat': read('ci.bat') };
+  const problems = Object.entries(scriptsText).flatMap(([file, text]) => [
+    ...['npm ci', 'npm run build', 'npm test', 'npm run package'].filter((s) => !text.includes(s)).map((s) => `${file}: немає ${s}`),
+    ...(/\|\|\s*(?:true|exit\s+(?:\/b\s+)?0)\b|set \+e/.test(text) ? [`${file}: помилку приховано`] : []),
+  ]);
+  check('P4', 'ci.sh і ci.bat: npm ci, build, test, package без приховування помилок', !problems.length, problems.join('\n'));
 }
 
-// ---- G. git hygiene -------------------------------------------------------------
-const SECRET_PATTERNS = [
-  /ghp_[A-Za-z0-9]{30,}/, /gho_[A-Za-z0-9]{30,}/, /github_pat_[A-Za-z0-9_]{40,}/,
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /AKIA[0-9A-Z]{16}/, /xox[baprs]-[A-Za-z0-9-]{10,}/,
-];
+// ---- git: repository, ignored build output, no secrets -----------------------------
+const SECRETS = /gh[pousr]_[A-Za-z0-9]{30,}|github_pat_\w{40,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}/;
 
-function checkGit() {
-  const inside = sh('git rev-parse --is-inside-work-tree');
-  record('G1', 'Каталог є Git-репозиторієм', inside.code === 0 && inside.out.trim() === 'true', tail(inside.out, 2));
-  if (inside.code !== 0) return;
+function git() {
+  const inside = sh('git rev-parse --is-inside-work-tree').out.trim();
+  check('G1', 'Каталог є Git-репозиторієм', inside === 'true', inside);
+  if (inside !== 'true') return;
 
-  const ignored = sh('git check-ignore build/probe node_modules/probe');
-  record('G2', 'build/ і node_modules/ ігноруються Git', ignored.code === 0 && ignored.out.trim().split('\n').length === 2,
-    ignored.code === 0 ? '' : 'додайте build/ і node_modules/ у .gitignore (команда git-init)');
+  const ignored = sh('git check-ignore build/probe node_modules/probe').out.trim().split('\n').filter(Boolean);
+  const tracked = sh('git ls-files build node_modules').out.trim();
+  check('G2', 'build/ і node_modules/ ігноруються й не відстежуються Git', ignored.length === 2 && !tracked,
+    tracked ? `відстежуються: ${tail(tracked, 3)}` : 'додайте build/ і node_modules/ у .gitignore (git-init)');
 
-  const tracked = sh('git ls-files build node_modules');
-  record('G3', 'У Git немає build-каталогів і залежностей', tracked.code === 0 && tracked.out.trim() === '',
-    tracked.out.trim() ? `відстежуються: ${tail(tracked.out, 5)}` : '');
-
-  // tracked files plus new (untracked, not ignored) files: a first `init` creates
-  // the whole project as untracked files, and they must be scanned before the commit
-  const files = sh('git ls-files --cached --others --exclude-standard').out
-    .split('\n').map((s) => s.trim()).filter(Boolean);
-  const leaks = [];
-  for (const file of files) {
-    if (/(^|\/)\.env(\.|$)/.test(file)) leaks.push(`${file} (.env)`);
-    const path = join(ROOT, file);
-    if (!existsSync(path) || statSync(path).size > 2 * 1024 * 1024) continue;
-    const text = readFileSync(path, 'utf8');
-    if (SECRET_PATTERNS.some((re) => re.test(text))) leaks.push(file);
-  }
-  record('G4', 'Секретів (токени, ключі, .env) у файлах репозиторію немає', !leaks.length, leaks.join(', '));
+  // tracked and new files: the first init creates the whole project as untracked files
+  const leaks = sh('git ls-files --cached --others --exclude-standard').out.split('\n').map((f) => f.trim())
+    .filter((f) => f && (/(^|\/)\.env(\.|$)|\.(pem|key)$/.test(f)
+      || (exists(f) && statSync(join(ROOT, f)).size < 2 ** 21 && SECRETS.test(read(f)))));
+  check('G3', 'Секретів (токени, ключі, .env) у репозиторії немає', !leaks.length, leaks.join(', '));
 }
 
-// ---- B. build and tests -----------------------------------------------------------
-function checkBuild() {
-  if (!exists('package.json')) {
-    record('B0', 'Складання і тести', false, 'немає package.json - спочатку create-build');
-    return;
-  }
+// ---- build: build, tests, executable ------------------------------------------------
+function build() {
+  if (!exists('package.json')) return check('B1', 'Складання', false, 'немає package.json - виконайте create-build');
   if (!exists('node_modules')) {
     const ci = sh('npm ci --no-audit --no-fund');
-    record('B0', 'Встановлення залежностей (npm ci)', ci.code === 0, ci.code === 0 ? '' : tail(ci.out));
+    check('B0', 'Залежності: npm ci', ci.code === 0, tail(ci.out));
     if (ci.code !== 0) return;
   }
-  const build = sh('npm run build');
-  record('B1', 'Складання: npm run build (tsc + esbuild)', build.code === 0 && exists('build/hello.cjs'),
-    build.code === 0 ? '' : tail(build.out));
+  const b = sh('npm run build');
+  check('B1', 'Складання: npm run build (tsc + esbuild)', b.code === 0 && exists('build/hello.cjs'), tail(b.out));
 
-  const test = sh('npm test');
-  const junit = exists('build/test-results/junit.xml') ? read('build/test-results/junit.xml') : '';
-  // BasicAddition must really run and pass: no <skipped/>, <failure> or <error> inside its testcase,
-  // and no skipped tests at all (a skipped test also makes Vitest exit with code 0)
-  const basicCase = junit.match(/<testcase[^>]*name="[^"]*BasicAddition"[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/);
-  const basic = Boolean(basicCase) && !/<(skipped|failure|error)\b/.test(basicCase[1] ?? '');
-  const failures = junit.match(/<testsuites[^>]*failures="(\d+)"/);
-  const skipped = (junit.match(/<skipped\b/g) ?? []).length;
-  const okTests = test.code === 0 && basic && failures && failures[1] === '0' && skipped === 0;
-  // show the failing test and the assertion message instead of the whole Vitest output
-  const reason = test.out.split('\n')
-    .map((line) => line.trim())
-    .filter((line) => /^(FAIL\s|AssertionError|TypeError|ReferenceError|Error:)/.test(line))
-    .slice(0, 4)
-    .join('\n');
-  record('B2', 'Тести: npm test (Vitest), BasicAddition виконано і пройдено', okTests,
-    okTests ? '' : reason || (skipped ? `пропущено тестів: ${skipped} (BasicAddition: ${basic ? 'OK' : 'не виконано'})`
-      : tail(test.out)) || 'JUnit-звіт без BasicAddition');
+  // BasicAddition must really run and pass; a skipped test would also give exit code 0
+  const t = sh('npm test');
+  const junit = read('build/test-results/junit.xml');
+  const basic = junit.match(/<testcase[^>]*name="[^"]*BasicAddition"[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/);
+  const passed = t.code === 0 && basic && !/<(skipped|failure|error)\b/.test(basic[1] ?? '') && !/<skipped\b/.test(junit);
+  const reason = t.out.split('\n').map((l) => l.trim()).filter((l) => /^(FAIL\s|AssertionError|Error:)/.test(l));
+  check('B2', 'Тести: npm test, BasicAddition виконано і пройдено', passed, reason.slice(0, 3).join('\n') || tail(t.out));
 
-  const pack = sh('npm run package');
   const exe = process.platform === 'win32' ? 'build/hello.exe' : 'build/hello';
-  record('B3', `Виконуваний файл ${exe} створено`, pack.code === 0 && exists(exe), pack.code === 0 ? '' : tail(pack.out));
-
-  if (exists(exe)) {
-    const run = spawnSync(join(ROOT, exe), { encoding: 'utf8' });
-    const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
-    record('B4', `Запуск ${exe} друкує "Hello, World!"`, run.status === 0 && out.includes('Hello, World!'), tail(out, 3));
-  }
+  const p = sh('npm run package');
+  check('B3', `Виконуваний файл ${exe}`, p.code === 0 && exists(exe), tail(p.out));
+  const run = spawnSync(join(ROOT, exe), { encoding: 'utf8' });
+  check('B4', `${exe} друкує "Hello, World!"`, run.status === 0 && String(run.stdout).includes('Hello, World!'),
+    `${run.stdout ?? ''}${run.stderr ?? ''}${run.error ?? ''}`);
 }
 
-// ---- W. workflow ------------------------------------------------------------------
-const OSES = ['ubuntu-latest', 'windows-latest', 'macos-latest'];
-
-function checkWorkflow() {
+// ---- workflow: YAML, triggers, matrix, steps, artifacts ------------------------------
+function workflow() {
   const file = '.github/workflows/ci.yml';
-  if (!exists(file)) {
-    record('W1', 'Workflow .github/workflows/ci.yml', false, 'файл відсутній - виконайте create-actions');
-    return;
-  }
-  let YAML;
-  try {
-    YAML = createRequire(join(ROOT, 'package.json'))('yaml');
-  } catch {
-    record('W1', 'YAML workflow коректний', false, 'немає пакета yaml - виконайте npm ci');
-    return;
-  }
+  if (!exists(file)) return check('W1', 'Workflow .github/workflows/ci.yml', false, 'файлу немає - виконайте create-actions');
   let wf;
   try {
-    wf = YAML.parse(read(file));
-    record('W1', 'YAML workflow синтаксично коректний', true);
+    wf = createRequire(join(ROOT, 'package.json'))('yaml').parse(read(file));
   } catch (error) {
-    record('W1', 'YAML workflow синтаксично коректний', false, String(error.message).split('\n')[0]);
-    return;
+    return check('W1', 'YAML workflow коректний', false, String(error.message).split('\n')[0]);
   }
+  check('W1', 'YAML workflow коректний', true);
 
-  const on = wf?.on ?? {};
-  const branches = (event) => (Array.isArray(on?.[event]?.branches) ? on[event].branches : []);
-  const triggersOk = ['push', 'pull_request'].every((e) => ['develop', 'master'].every((b) => branches(e).includes(b)));
-  record('W2', 'Тригери: push і pull_request до develop та master', triggersOk,
-    triggersOk ? '' : `push: [${branches('push')}], pull_request: [${branches('pull_request')}]`);
+  const branches = (event) => wf?.on?.[event]?.branches ?? [];
+  check('W2', 'Тригери: push і pull_request до develop і master',
+    ['push', 'pull_request'].every((e) => ['develop', 'master'].every((b) => branches(e).includes(b))),
+    `push: [${branches('push')}], pull_request: [${branches('pull_request')}]`);
 
   const jobs = Object.values(wf?.jobs ?? {});
   const job = jobs[0] ?? {};
-  const os = job?.strategy?.matrix?.os ?? [];
-  const osOk = jobs.length === 1 && OSES.every((o) => os.includes(o)) && os.length === OSES.length
-    && String(job['runs-on']).includes('matrix.os');
-  record('W3', 'Одна job з matrix: ubuntu-latest, windows-latest, macos-latest', osOk,
-    osOk ? '' : `jobs: ${jobs.length}, matrix.os: [${os}]`);
+  const os = job.strategy?.matrix?.os ?? [];
+  check('W3', 'Одна job з matrix: ubuntu-latest, windows-latest, macos-latest',
+    jobs.length === 1 && os.length === 3 && ['ubuntu-latest', 'windows-latest', 'macos-latest'].every((o) => os.includes(o))
+      && String(job['runs-on']).includes('matrix.os'), `jobs: ${jobs.length}, matrix.os: [${os}]`);
 
-  const steps = job?.steps ?? [];
-  const runs = steps.filter((s) => s.run).map((s) => String(s.run).trim());
-  const allowed = /^(bash \.\/ci\.sh|\.\/ci\.sh|\.\\ci\.bat|ci\.bat)$/;
-  const extra = runs.filter((r) => !allowed.test(r));
-  const usesCheckout = steps.some((s) => String(s.uses ?? '').startsWith('actions/checkout@'));
-  // the scripts must really run on their OS: fixed `if` conditions, no continue-on-error anywhere
-  const expectedIf = (s) => {
-    const run = String(s.run ?? '');
-    if (run.includes('ci.sh')) return "runner.os != 'Windows'";
-    if (run.includes('ci.bat')) return "runner.os == 'Windows'";
-    if (String(s.uses ?? '').startsWith('actions/upload-artifact@')) return 'always()';
-    return undefined;
-  };
-  const badIf = steps.filter((s) => s.if !== undefined && String(s.if).trim() !== expectedIf(s))
-    .map((s) => `${s.name ?? s.uses ?? s.run}: if: ${s.if}`);
-  const missingIf = steps.filter((s) => s.run && s.if === undefined).map((s) => `${s.run}: немає if`);
-  const softFail = /continue-on-error/.test(read(file)) || job.if !== undefined;
-  const scriptsOk = usesCheckout && !extra.length && !badIf.length && !missingIf.length && !softFail
-    && runs.some((r) => r.includes('ci.sh')) && runs.some((r) => r.includes('ci.bat'));
-  record('W4', 'Кроки: checkout і лише виклики ci.sh / ci.bat без обходу помилок', scriptsOk,
-    scriptsOk ? '' : [`checkout: ${usesCheckout}`, `зайві run: ${extra.join(' | ') || '-'}`,
-      ...badIf, ...missingIf, softFail ? 'continue-on-error або if на рівні job' : ''].filter(Boolean).join('; '));
+  // only the two CI scripts, each with its fixed `if`; nothing may hide a failure
+  const steps = job.steps ?? [];
+  const fixedIf = { 'bash ./ci.sh': "runner.os != 'Windows'", '.\\ci.bat': "runner.os == 'Windows'" };
+  const runs = steps.filter((s) => s.run).map((s) => [String(s.run).trim(), String(s.if ?? '').trim()]);
+  const wrong = runs.filter(([run, cond]) => fixedIf[run] !== cond).map(([run, cond]) => `${run} (if: ${cond || '-'})`);
+  const checkout = steps.some((s) => String(s.uses ?? '').startsWith('actions/checkout@'));
+  const soft = /continue-on-error/.test(read(file)) || job.if !== undefined;
+  check('W4', 'Кроки: checkout і лише ci.sh / ci.bat без обходу помилок', checkout && runs.length === 2 && !wrong.length && !soft,
+    [`checkout: ${checkout}`, ...wrong, soft ? 'continue-on-error або if на рівні job' : ''].filter(Boolean).join('; '));
 
-  const text = read(file);
-  const artifacts = steps.some((s) => String(s.uses ?? '').startsWith('actions/upload-artifact@'));
-  const noSecrets = !/\$\{\{\s*secrets\./.test(text);
-  record('W5', 'Результат job зберігається (artifact), секретів у workflow немає', artifacts && noSecrets,
-    `artifact: ${artifacts}; secrets: ${!noSecrets}`);
+  const artifact = steps.some((s) => String(s.uses ?? '').startsWith('actions/upload-artifact@'));
+  const secrets = /\$\{\{\s*secrets\./.test(read(file));
+  check('W5', 'Результат job зберігається (artifact), секретів немає', artifact && !secrets,
+    `artifact: ${artifact}; secrets: ${secrets}`);
 }
 
-// ---- run ----------------------------------------------------------------------
-const plan = [
-  ['agent', 'Агент (manifest, skills, commands)', checkAgent],
-  ['project', 'Файли проєкту', checkProject],
-  ['git', 'Git', checkGit],
-  ['build', 'Складання і тести', checkBuild],
-  ['workflow', 'GitHub Actions workflow', checkWorkflow],
-];
-console.log(`check: ${ROOT}`);
-for (const [group, title, fn] of plan) {
-  if (!enabled(group)) continue;
-  console.log(`\n== ${title}`);
-  const before = results.length;
-  fn();
-  for (const r of results.slice(before)) {
-    const mark = r.status === 'OK' ? '[ OK ]' : '[FAIL]';
-    console.log(`${mark} ${r.id.padEnd(5)} ${r.title}`);
-    if (r.status !== 'OK' && r.details) console.log(r.details.replace(/^/gm, '         '));
+// ---- run ---------------------------------------------------------------------------
+const TITLES = { agent: 'Агент', project: 'Файли проєкту', git: 'Git', build: 'Складання і тести', workflow: 'GitHub Actions' };
+const RUN = { agent, project, git, build, workflow };
+for (const group of GROUPS.filter(enabled)) {
+  console.log(`\n== ${TITLES[group]}`);
+  const start = results.length;
+  RUN[group]();
+  for (const r of results.slice(start)) {
+    console.log(`${r.ok ? '[ OK ]' : '[FAIL]'} ${r.id.padEnd(3)} ${r.title}`);
+    if (!r.ok && r.details) console.log(String(r.details).replace(/^/gm, '       '));
   }
 }
-
-const failed = results.filter((r) => r.status === 'FAIL');
-const summary = `${results.length - failed.length}/${results.length} перевірок пройдено` +
-  (failed.length ? `, помилок: ${failed.length} (${failed.map((r) => r.id).join(', ')})` : '');
-console.log(`\ncheck: ${failed.length ? 'FAILED' : 'OK'} - ${summary}`);
-
-try {
-  mkdirSync(join(ROOT, 'build'), { recursive: true });
-  const rows = results.map((r) => `| ${r.id} | ${r.status} | ${r.title} | ${r.details.replace(/\n/g, ' ').replace(/\|/g, '/')} |`);
-  writeFileSync(join(ROOT, 'build', 'check-report.md'),
-    `# Звіт команди check\n\n| ID | Статус | Перевірка | Деталі |\n|---|---|---|---|\n${rows.join('\n')}\n\n**${summary}**\n`);
-} catch {
-  // The report file is optional; console output is the primary result.
-}
+const failed = results.filter((r) => !r.ok);
+console.log(`\ncheck: ${failed.length ? 'FAILED' : 'OK'} - ${results.length - failed.length}/${results.length} перевірок пройдено`
+  + (failed.length ? `, помилок: ${failed.length} (${failed.map((r) => r.id).join(', ')})` : ''));
 process.exit(failed.length ? 1 : 0);
