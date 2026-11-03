@@ -19,7 +19,7 @@ description: Створює мінімальний Hello World на TypeScript �
 
 ## Результат
 
-Файли створюються за правилом `CREATED` / `UNCHANGED` / `CONFLICT` з маніфесту.
+Файли створюються за правилом `CREATED` / `UPDATED` / `UNCHANGED` / `CONFLICT` з маніфесту.
 
 ### `src/main.ts`
 
@@ -65,7 +65,8 @@ build/
 
 ### Розділ `README.md`
 
-Якщо в `README.md` ще немає розділу `## Проєкт`, дописати в кінець (замість `hello-ts` — `PROJECT_NAME`):
+Якщо в `README.md` ще немає розділу `## Проєкт`, дописати в кінець через порожній рядок
+(замість `hello-ts` — `PROJECT_NAME`):
 
 ````markdown
 ## Проєкт `hello-ts`
@@ -98,7 +99,7 @@ node src/main.ts
 ## Приклад
 
 - **Вхід:** `LANGUAGE=TypeScript`, `PROJECT_NAME=hello-ts`, репозиторій лише з агентом.
-- **Очікуваний результат:** `CREATED src/main.ts`, `CREATED src/greeting.ts`, розділ README дописано,
+- **Очікуваний результат:** `CREATED src/main.ts`, `CREATED src/greeting.ts`, `UPDATED README.md`,
   `.gitignore` і `.gitattributes` — `UNCHANGED`; `node src/main.ts` друкує `Hello, World!`.
 - **Типовий сценарій помилки:** передано `LANGUAGE=Rust`. Агент нічого не створює, а `init` зупиняється на кроці 2:
   `create-project: FAILED — мова Rust не підтримується. Дія: використайте TypeScript (варіант 6).`
