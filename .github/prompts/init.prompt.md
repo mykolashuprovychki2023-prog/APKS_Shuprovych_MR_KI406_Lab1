@@ -42,7 +42,7 @@ argument-hint: "projectName=hello-ts"
 | Що | Як | Очікування |
 |---|---|---|
 | підсумкова | `node tools/check.mjs` | код 0, усі `[ OK ]` |
-| повторний запуск | виконати `init` ще раз | усі файли `UNCHANGED` (вміст збігається зі skills), `git status --short` без нових змін |
+| повторний запуск | користувач окремо запускає `init` ще раз | усі файли `UNCHANGED` (вміст збігається зі skills), `git status --short` без нових змін |
 
 ## Повідомлення про помилку
 
@@ -58,6 +58,6 @@ argument-hint: "projectName=hello-ts"
 | … | … | … | … | … |
 | 5 | check | … | … | … |
 
-Після таблиці — вивід `git status --short` і наступні кроки для користувача: створити гілку
-(`git switch -c feature/lab1-hello-ts`), переглянути зміни, закомітити (`ci.sh` — з `git add --chmod=+x ci.sh`),
-зробити push і pull request до `develop`.
+Після таблиці — вивід `git status --short`. Якщо є нові файли, наступні кроки для користувача: створити гілку
+(`git switch -c feature/lab1-hello-ts`, якщо її ще немає), переглянути зміни, закомітити (`ci.sh` — з
+`git add --chmod=+x ci.sh`), зробити push і pull request до `develop`.

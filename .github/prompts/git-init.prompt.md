@@ -31,7 +31,7 @@ agent: build-engineer
 |---|---|---|
 | репозиторій | `git rev-parse --is-inside-work-tree` | `true` |
 | ігнорування | `git check-ignore build/probe node_modules/probe` | надруковано обидва шляхи |
-| повторний запуск | виконати команду ще раз | `.gitignore` і `.gitattributes` — `UNCHANGED` |
+| повторний запуск | користувач окремо запускає команду ще раз | `.gitignore` і `.gitattributes` — `UNCHANGED` |
 
 ## Повідомлення про помилку
 

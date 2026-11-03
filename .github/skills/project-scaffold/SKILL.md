@@ -86,7 +86,7 @@ node src/main.ts
 | вихідний файл є | `node -e "require('fs').accessSync('src/main.ts')"` | код 0 |
 | команда запуску працює | `node src/main.ts` | перший рядок `Hello, World!` |
 | README містить команду запуску | пошук `node src/main.ts` у `README.md` | рядок знайдено |
-| повторний запуск | виконати skill ще раз | усі файли `UNCHANGED` |
+| повторний запуск | наступний окремий запуск команди | усі файли `UNCHANGED` |
 
 ## Обробка помилок
 
