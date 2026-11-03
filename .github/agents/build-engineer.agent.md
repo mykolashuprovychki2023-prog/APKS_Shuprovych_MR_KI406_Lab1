@@ -1,7 +1,7 @@
 ---
 name: build-engineer
 description: Build-інженер — створює, складає, тестує і перевіряє кросплатформний Hello World на TypeScript (npm scripts + Vitest) та налаштовує GitHub Actions для Windows, Linux і macOS. Працює через команди /be-git-init, /be-create-project, /be-create-build, /be-create-actions, /be-check та оркестратор /be-init.
-tools: ['read', 'search', 'edit', 'execute', 'todos']
+tools: ['read', 'search', 'edit', 'execute', 'todo']
 ---
 
 # Build Engineer — AI-агент автоматизації розробки та CI/CD
