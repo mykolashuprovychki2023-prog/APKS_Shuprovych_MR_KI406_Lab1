@@ -45,7 +45,7 @@ Skill містить точний вміст файлів, тому резуль
 |---|---|
 | користувач → `init` | `projectName` (за замовчуванням `hello-ts`) |
 | `init` → `create-project`, `create-build` | `PROJECT_NAME`, `LANGUAGE=TypeScript` |
-| кожен крок → підсумковий звіт | статуси файлів (`CREATED` / `UNCHANGED` / `CONFLICT`), коди виходу |
+| кожен крок → підсумковий звіт | статуси файлів (`CREATED` / `UPDATED` / `UNCHANGED` / `CONFLICT`), коди виходу |
 | `create-build` → `check`, CI | `build/hello.cjs`, `build/hello(.exe)`, `build/test-results/junit.xml` |
 | `check` → користувач | таблиця `[ OK ]` / `[FAIL]` і код виходу |
 

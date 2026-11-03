@@ -29,7 +29,7 @@ argument-hint: "projectName=hello-ts"
 5. [check.prompt.md](./check.prompt.md)
 
 Між кроками передаються назва проєкту (кроки 2–3), статуси файлів, коди виходу і шляхи артефактів
-(`build/hello`, `build/test-results/junit.xml`) — до підсумкового звіту.
+(`build/hello(.exe)`, `build/test-results/junit.xml`) — до підсумкового звіту.
 
 ## Очікувані файли
 
@@ -42,7 +42,7 @@ argument-hint: "projectName=hello-ts"
 | Що | Як | Очікування |
 |---|---|---|
 | підсумкова | `node tools/check.mjs` | код 0, усі `[ OK ]` |
-| повторний запуск | виконати `init` ще раз | усі файли `UNCHANGED`, `git status --short` без нових змін |
+| повторний запуск | виконати `init` ще раз | усі файли `UNCHANGED` (вміст збігається зі skills), `git status --short` без нових змін |
 
 ## Повідомлення про помилку
 
@@ -58,5 +58,6 @@ argument-hint: "projectName=hello-ts"
 | … | … | … | … | … |
 | 5 | check | … | … | … |
 
-Після таблиці — вивід `git status --short` і наступні кроки для користувача: переглянути зміни, закомітити
-(`ci.sh` — з `git add --chmod=+x ci.sh`), зробити push і pull request до `develop`.
+Після таблиці — вивід `git status --short` і наступні кроки для користувача: створити гілку
+(`git switch -c feature/lab1-hello-ts`), переглянути зміни, закомітити (`ci.sh` — з `git add --chmod=+x ci.sh`),
+зробити push і pull request до `develop`.

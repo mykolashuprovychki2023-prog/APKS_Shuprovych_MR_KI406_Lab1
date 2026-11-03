@@ -34,7 +34,7 @@ argument-hint: "projectName=hello-ts"
 | Що | Команда | Очікування |
 |---|---|---|
 | повний цикл | `.\ci.bat` або `bash ci.sh` | останній рядок `==== CI OK ====` |
-| тест | вивід `npm test` | `HelloTest > BasicAddition` пройдено, `2 passed` |
+| тести | вивід `npm test`, `build/test-results/junit.xml` | `Tests  2 passed (2)`; у JUnit-звіті `HelloTest > BasicAddition` без `failure` і `skipped` |
 | виконуваний файл | `build\hello.exe` або `build/hello` | `Hello, World!` |
 | Git | `git status --short` | немає `build/` і `node_modules/` |
 
