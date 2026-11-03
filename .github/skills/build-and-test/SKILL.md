@@ -22,7 +22,8 @@ description: Налаштовує складання (npm scripts, tsc, esbuild,
 Файли створюються за правилом `CREATED` / `UNCHANGED` / `CONFLICT` з маніфесту. Система складання — npm scripts:
 `build` (перевірка типів `tsc` і бандл `build/hello.cjs` через esbuild), `test` (Vitest, JUnit-звіт у `build/`),
 `package` (виконуваний файл `build/hello`, на Windows — `build/hello.exe`). `package-lock.json` створює
-`npm install`. Пакет `yaml` потрібен команді `check`: нею вона читає `ci.yml`.
+`npm install`, лише якщо файлу ще немає (`CREATED`); наявний не змінюється (`UNCHANGED`). Пакет `yaml` потрібен
+команді `check`: нею вона читає `ci.yml`.
 
 ### `package.json`
 
