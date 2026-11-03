@@ -6,43 +6,34 @@ agent: build-engineer
 
 # Команда git-init
 
-Готує репозиторій до роботи агента: Git ініціалізовано, тимчасові каталоги та секрети ігноруються.
-Використовує частину skill [project-scaffold](../skills/project-scaffold/SKILL.md) (лише `.gitignore` і `.gitattributes`).
+Готує репозиторій: Git ініціалізовано, `build/`, `node_modules/` і секрети ігноруються.
+Використовує розділ про `.gitignore` і `.gitattributes` зі skill [project-scaffold](../skills/project-scaffold/SKILL.md).
 
 ## Передумови
 
-- Git встановлено: `git --version`.
-- Node.js ≥ 22.18: `node --version`.
-- Поточний каталог — корінь репозиторію (є `.github/skills`).
+- Git: `git --version`.
+- Поточний каталог — корінь репозиторію з `.github/skills`.
 
 ## Дії
 
-1. Перевір, чи це Git-репозиторій: `git rev-parse --is-inside-work-tree`.
-   Якщо ні — `git init -b develop` (команда нічого не видаляє).
-2. Створи або доповни `.gitignore` і `.gitattributes`:
-   `node tools/apply-templates.mjs project-scaffold --only .gitignore --only .gitattributes`
-3. Переконайся, що службові каталоги ігноруються: `git check-ignore -v build/probe node_modules/probe`.
-4. Покажи стан: `git status --short --branch` і `git log --oneline -5` (якщо коміти вже є).
+1. `git rev-parse --is-inside-work-tree`; якщо це не репозиторій — `git init -b develop`.
+2. Допиши в `.gitignore` і `.gitattributes` відсутні рядки зі skill (наявні не дублюй).
+3. Перевір ігнорування: `git check-ignore build/probe node_modules/probe`.
+4. Покажи стан: `git status --short --branch`.
 
 ## Очікувані файли
 
-- `.gitignore` — містить `node_modules/`, `build/`, `.env`, `*.pem`, `*.key`.
-- `.gitattributes` — `* text=auto eol=lf`, `*.bat text eol=crlf`.
+`.gitignore`, `.gitattributes`.
 
 ## Перевірка
 
-| Перевірка | Команда | Очікування |
+| Що | Команда | Очікування |
 |---|---|---|
-| Репозиторій існує | `git rev-parse --is-inside-work-tree` | `true` |
-| Каталоги ігноруються | `git check-ignore build/probe node_modules/probe` | обидва шляхи надруковано |
-| Ідемпотентність | повторити крок 2 | `UNCHANGED .gitignore`, `UNCHANGED .gitattributes` |
+| репозиторій | `git rev-parse --is-inside-work-tree` | `true` |
+| ігнорування | `git check-ignore build/probe node_modules/probe` | надруковано обидва шляхи |
+| повторний запуск | виконати команду ще раз | `.gitignore` і `.gitattributes` — `UNCHANGED` |
 
 ## Повідомлення про помилку
 
 - `git-init: FAILED — Git не знайдено. Дія: встановіть Git і повторіть /be-git-init.`
-- `git-init: FAILED — .gitignore не ігнорує build/ або node_modules/ (рядок закоментовано чи додано правило-виняток «!build/»). Дія: виправте .gitignore і повторіть /be-git-init.`
-- `git-init: FAILED — команду запущено не з кореня репозиторію. Дія: відкрийте корінь і повторіть.`
-
-## Повторний запуск
-
-Безпечний: команда лише дописує відсутні рядки й нічого не видаляє.
+- `git-init: FAILED — .gitignore не ігнорує build/ або node_modules/. Дія: приберіть правило-виняток і повторіть.`
