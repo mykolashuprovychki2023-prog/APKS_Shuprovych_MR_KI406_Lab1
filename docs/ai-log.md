@@ -64,6 +64,14 @@
 
 ## Докази перевірки
 
-- Гілка `develop`: `node tools/check.mjs --agent-only` → усі перевірки `OK`.
-- Запуск агента, повна перевірка `check` і GitHub Actions — у гілці `feature/lab1-hello-ts` і PR #1:
-  <https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/pull/1>
+Windows 10, Node.js 24.20.0, npm 11.19.0:
+
+- Гілка `develop`: `node tools/check.mjs --agent-only` → 8/8.
+- `/be-init` окремим екземпляром AI на чистій копії `develop`: 5 кроків `OK`, `check` 21/21; повторний `init` — лише
+  `UNCHANGED`; 26 файлів (без `docs/` і `package-lock.json`) побайтово збігаються з гілкою `feature/lab1-hello-ts`.
+- Повторний `/be-init` на клоні гілки `feature/lab1-hello-ts`: усі файли `UNCHANGED`, `git status --short` порожній.
+- Гілка `feature/lab1-hello-ts`: `node tools/check.mjs` → 21/21; `.\ci.bat` і `bash ci.sh` → `==== CI OK ====`;
+  `build\hello.exe` → `Hello, World!`.
+- Зламаний тест (`toBe(5)` → `toBe(6)`): `[FAIL] B2 ... AssertionError: expected 5 to be 6`, код виходу 1.
+- GitHub Actions для PR #1 (Windows, Linux, macOS):
+  <https://github.com/mykolashuprovychki2023-prog/APKS_Shuprovych_MR_KI406_Lab1/pull/1/checks>
