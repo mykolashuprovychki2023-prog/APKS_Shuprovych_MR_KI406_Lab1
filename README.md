@@ -33,3 +33,12 @@ Hello World на TypeScript і налаштовує GitHub Actions для Window
 | `feature/lab1-hello-ts` | проєкт, створений агентом, з CI |
 
 Pull request `lab1/finish`: `feature/lab1-hello-ts` → `develop`.
+
+## Проєкт `hello-ts`
+
+Мінімальний кросплатформний Hello World на TypeScript. Запуск без складання
+(Node.js ≥ 22.18 виконує TypeScript напряму):
+
+```bash
+node src/main.ts
+```

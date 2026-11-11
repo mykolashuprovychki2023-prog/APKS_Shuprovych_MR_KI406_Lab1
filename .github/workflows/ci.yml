@@ -1,0 +1,40 @@
+# CI: one job with a matrix of three OSes; all build logic is in ci.sh / ci.bat.
+name: CI
+
+on:
+  push:
+    branches: [develop, master]
+  pull_request:
+    branches: [develop, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.20.0
+      - name: Build and test (ci.sh)
+        if: runner.os != 'Windows'
+        run: bash ./ci.sh
+      - name: Build and test (ci.bat)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: .\ci.bat
+      - name: Upload executable and test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hello-${{ runner.os }}
+          path: |
+            build/hello
+            build/hello.exe
+            build/test-results/junit.xml
